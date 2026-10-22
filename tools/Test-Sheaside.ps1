@@ -14,6 +14,7 @@ $sources = @(
     'tests/SmokeTests.cs',
     'tests/ReorderTests.cs',
     'tests/AppearanceTests.cs',
+    'tests/ChartTests.cs',
     'Sheaside/Models/WorksheetItem.cs',
     'Sheaside/Models/WorksheetDragEventArgs.cs',
     'Sheaside/Controls/ReorderableSheetListBox.cs',
@@ -22,6 +23,7 @@ $sources = @(
     'Sheaside/Controls/RenameSheetDialog.cs',
     'Sheaside/Services/WorksheetNameRules.cs',
     'Sheaside/Services/ExcelWorksheetService.cs'
+    'Sheaside/Services/ExcelSheet.cs'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
 $executable = Join-Path $output 'SmokeTests.exe'
 & $compiler /nologo /target:exe /debug:full /langversion:7.3 "/out:$executable" "/link:$interop" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Microsoft.CSharp.dll @sources

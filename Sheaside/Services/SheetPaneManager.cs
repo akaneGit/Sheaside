@@ -212,7 +212,7 @@ namespace Sheaside.Services
         {
             if (disposed || operating || draggingEntry != null) return;
             try { entry.View.ShowStatus(worksheets.ActivateWorksheet(handle, worksheet.Id)); }
-            catch (COMException exception)
+            catch (Exception exception) when (IsOperationError(exception))
             {
                 Trace.TraceWarning("Sheaside activation: {0}", exception);
                 entry.View.ShowStatus("シートを切り替えられません。セルの編集やダイアログを閉じて、もう一度お試しください。");
@@ -240,7 +240,7 @@ namespace Sheaside.Services
                         status = "シートを再表示しました。";
                         break;
                     case WorksheetCommand.RevealVeryHidden:
-                        string revealName = target.Worksheet.Name;
+                        string revealName = target.Sheet.Name;
                         if (MessageBox.Show(entry.View, "VeryHiddenのシート「" + revealName + "」を再表示しますか？",
                             "Sheaside — VeryHiddenの再表示", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                             MessageBoxDefaultButton.Button2) == DialogResult.Yes)
@@ -252,7 +252,7 @@ namespace Sheaside.Services
                     case WorksheetCommand.SetTabColor:
                         using (var dialog = new ColorDialog { FullOpen = true })
                         {
-                            int? color = worksheets.GetTabColor(target.Worksheet);
+                            int? color = worksheets.GetTabColor(target.Sheet);
                             dialog.Color = color.HasValue ? System.Drawing.ColorTranslator.FromOle(color.Value) : System.Drawing.SystemColors.Window;
                             if (dialog.ShowDialog(entry.View) == DialogResult.OK)
                             {
@@ -270,7 +270,7 @@ namespace Sheaside.Services
                         status = "シートを追加しました。";
                         break;
                     case WorksheetCommand.Rename:
-                        using (var dialog = new RenameSheetDialog(target.Worksheet.Name, newName =>
+                        using (var dialog = new RenameSheetDialog(target.Sheet.Name, newName =>
                         {
                             try { worksheets.RenameWorksheet(target, newName); return null; }
                             catch (Exception exception) when (IsOperationError(exception)) { return OperationErrorMessage(exception); }
@@ -278,7 +278,7 @@ namespace Sheaside.Services
                         {
                             if (dialog.ShowDialog(entry.View) == DialogResult.OK)
                             {
-                                entry.PreferredSelection = worksheets.GetWorksheetId(target.Worksheet);
+                                entry.PreferredSelection = worksheets.GetWorksheetId(target.Sheet);
                                 status = "シート名を変更しました。";
                             }
                         }
@@ -289,7 +289,7 @@ namespace Sheaside.Services
                         break;
                     case WorksheetCommand.Delete:
                         worksheets.EnsureCanDelete(target);
-                        string name = target.Worksheet.Name;
+                        string name = target.Sheet.Name;
                         if (MessageBox.Show(entry.View, "シート「" + name + "」を削除しますか？\nこの操作は元に戻せません。",
                             "Sheaside — シートの削除", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                             MessageBoxDefaultButton.Button2) == DialogResult.Yes)
@@ -347,7 +347,7 @@ namespace Sheaside.Services
             try
             {
                 bool moved = worksheets.MoveWorksheet(moveSession, args.Boundary);
-                entry.PreferredSelection = worksheets.GetWorksheetId(moveSession.Target.Worksheet);
+                entry.PreferredSelection = worksheets.GetWorksheetId(moveSession.Target.Sheet);
                 dragStatus = moved ? "シートを並び替えました。" : null;
             }
             catch (Exception exception) when (IsOperationError(exception))

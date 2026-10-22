@@ -2,6 +2,7 @@ using System;
 
 namespace Sheaside.Models
 {
+    internal enum SheetKind { Worksheet, Chart }
     internal enum WorksheetVisibility { Visible = -1, Hidden = 0, VeryHidden = 2 }
     // Only managed values cross the boundary between Excel and the view.
     internal sealed class WorksheetItem
@@ -9,21 +10,23 @@ namespace Sheaside.Models
         public WorksheetItem(string worksheetId, string name, bool isVisible)
             : this(worksheetId, name, isVisible ? WorksheetVisibility.Visible : WorksheetVisibility.Hidden, null) { }
 
-        public WorksheetItem(string worksheetId, string name, WorksheetVisibility visibility, int? tabColor)
+        public WorksheetItem(string worksheetId, string name, WorksheetVisibility visibility, int? tabColor, SheetKind kind = SheetKind.Worksheet)
         {
             Id = worksheetId;
             Name = name;
             Visibility = visibility;
             TabColor = tabColor;
+            Kind = kind;
         }
 
         public string Id { get; private set; }
         public string Name { get; private set; }
+        public SheetKind Kind { get; private set; }
         public WorksheetVisibility Visibility { get; private set; }
         // OLE RGB value; null is different from black (0).
         public int? TabColor { get; private set; }
         public bool IsVisible { get { return Visibility == WorksheetVisibility.Visible; } }
-        public string DisplayName { get { return IsVisible ? Name : Name + (Visibility == WorksheetVisibility.VeryHidden ? "（VeryHidden）" : "（非表示）"); } }
+        public string DisplayName { get { return (Kind == SheetKind.Chart ? "［グラフ］" : "") + Name + (IsVisible ? "" : (Visibility == WorksheetVisibility.VeryHidden ? "（VeryHidden）" : "（非表示）")); } }
     }
 
     internal sealed class WorksheetRequestedEventArgs : EventArgs

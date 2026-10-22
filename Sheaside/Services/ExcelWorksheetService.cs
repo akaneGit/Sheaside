@@ -13,7 +13,7 @@ namespace Sheaside.Services
         {
             public Excel.Window Window;
             public Excel.Workbook Workbook;
-            public Excel.Worksheet Worksheet;
+            public ExcelSheet Sheet;
             public int WindowHandle;
         }
 
@@ -21,7 +21,7 @@ namespace Sheaside.Services
         {
             public OperationTarget Target;
             public object[] SheetOrder;
-            public Excel.Worksheet[] Worksheets;
+            public ExcelSheet[] Sheets;
             public string[] WorksheetIds;
             public int SourceIndex;
         }
@@ -62,28 +62,29 @@ namespace Sheaside.Services
         public IList<WorksheetItem> GetWorksheets(Excel.Workbook workbook)
         {
             var result = new List<WorksheetItem>();
-            var worksheets = workbook.Worksheets;
+            var worksheets = workbook.Sheets;
             for (int i = 1; i <= worksheets.Count; i++)
             {
-                var sheet = (Excel.Worksheet)worksheets[i];
-                result.Add(new WorksheetItem(GetWorksheetId(sheet), sheet.Name, (WorksheetVisibility)(int)sheet.Visible, GetTabColor(sheet)));
+                var sheet = ExcelSheet.From(worksheets[i]);
+                result.Add(new WorksheetItem(GetWorksheetId(sheet), sheet.Name, (WorksheetVisibility)(int)sheet.Visible, GetTabColor(sheet), sheet.Kind));
             }
             return result;
         }
 
         public string GetActiveWorksheetId(Excel.Window window)
         {
-            var sheet = window.ActiveSheet as Excel.Worksheet;
+            var sheet = window.ActiveSheet;
             return sheet == null ? null : GetWorksheetId(sheet);
         }
 
-        public string GetWorksheetId(Excel.Worksheet sheet)
+        public string GetWorksheetId(object nativeSheet)
         {
             // Fresh workbooks can have empty CodeNames until Excel initializes VBA.
             // Names are unique within a workbook, including chart sheets. Prefixes
             // prevent collisions between a real CodeName and the fallback name.
+            var sheet = nativeSheet as ExcelSheet ?? ExcelSheet.From(nativeSheet);
             string codeName = sheet.CodeName;
-            return string.IsNullOrEmpty(codeName) ? "name:" + sheet.Name : "code:" + codeName;
+            return (sheet.Kind == SheetKind.Chart ? "chart:" : "") + (string.IsNullOrEmpty(codeName) ? "name:" + sheet.Name : "code:" + codeName);
         }
 
         public string ActivateWorksheet(int windowHandle, string codeName)
@@ -93,10 +94,10 @@ namespace Sheaside.Services
             var workbook = GetWorkbook(window);
             if (workbook == null) return "ブックが見つかりません。";
 
-            var worksheets = workbook.Worksheets;
+            var worksheets = workbook.Sheets;
             for (int i = 1; i <= worksheets.Count; i++)
             {
-                var sheet = (Excel.Worksheet)worksheets[i];
+                var sheet = ExcelSheet.From(worksheets[i]);
                 if (GetWorksheetId(sheet) != codeName) continue;
                 if (sheet.Visible != Excel.XlSheetVisibility.xlSheetVisible)
                     return sheet.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden
@@ -118,13 +119,13 @@ namespace Sheaside.Services
             var target = new OperationTarget { Window = window, Workbook = workbook, WindowHandle = windowHandle };
             if (codeName != null)
             {
-                var sheets = workbook.Worksheets;
+                var sheets = workbook.Sheets;
                 for (int i = 1; i <= sheets.Count; i++)
                 {
-                    var sheet = (Excel.Worksheet)sheets[i];
-                    if (GetWorksheetId(sheet) == codeName) { target.Worksheet = sheet; break; }
+                    var sheet = ExcelSheet.From(sheets[i]);
+                    if (GetWorksheetId(sheet) == codeName) { target.Sheet = sheet; break; }
                 }
-                if (target.Worksheet == null) throw new InvalidOperationException("対象のシートは既に削除されています。");
+                if (target.Sheet == null) throw new InvalidOperationException("対象のシートは既に削除されています。");
             }
             ValidateTarget(target);
             return target;
@@ -144,11 +145,11 @@ namespace Sheaside.Services
                 throw new InvalidOperationException("ブックの構成が保護されています。Excelで保護を解除してからお試しください。");
             if (target.Workbook.MultiUserEditing)
                 throw new InvalidOperationException("従来の共有ブックではこの操作はできません。共有を解除してからお試しください。");
-            if (target.Worksheet != null)
+            if (target.Sheet != null)
             {
-                var sheets = target.Workbook.Worksheets;
+                var sheets = target.Workbook.Sheets;
                 for (int i = 1; i <= sheets.Count; i++)
-                    if (Equals(sheets[i], target.Worksheet)) return;
+                    if (Equals(sheets[i], target.Sheet.Native)) return;
                 throw new InvalidOperationException("対象のシートは既に削除されています。操作をやり直してください。");
             }
         }
@@ -159,7 +160,7 @@ namespace Sheaside.Services
             target.Window.Activate();
             ValidateTarget(target);
             var sheets = target.Workbook.Sheets;
-            object after = target.Worksheet ?? sheets[sheets.Count];
+            object after = target.Sheet?.Native ?? sheets[sheets.Count];
             var added = (Excel.Worksheet)target.Workbook.Worksheets.Add(After: after);
             return GetWorksheetId(added);
         }
@@ -167,32 +168,33 @@ namespace Sheaside.Services
         public void RenameWorksheet(OperationTarget target, string newName)
         {
             ValidateTarget(target);
-            if (target.Worksheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
             var names = new List<string>();
             var sheets = target.Workbook.Sheets;
             for (int i = 1; i <= sheets.Count; i++)
             {
                 dynamic sheet = sheets[i];
-                if (!Equals((object)sheet, target.Worksheet)) names.Add((string)sheet.Name);
+                if (!Equals((object)sheet, target.Sheet.Native)) names.Add((string)sheet.Name);
             }
             string error = WorksheetNameRules.Validate(newName, names);
             if (error != null) throw new InvalidOperationException(error);
-            if (target.Worksheet.Name != newName) target.Worksheet.Name = newName;
+            if (target.Sheet.Name != newName) target.Sheet.Name = newName;
         }
 
         public string DuplicateWorksheet(OperationTarget target)
         {
             ValidateTarget(target);
-            if (target.Worksheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
             target.Window.Activate();
             ValidateTarget(target);
-            target.Worksheet.Copy(After: target.Worksheet);
-            var copy = (Excel.Worksheet)target.Worksheet.Next;
+            target.Sheet.CopyAfter();
+            var copy = target.Sheet.Next;
             return GetWorksheetId(copy);
         }
 
-        public int? GetTabColor(Excel.Worksheet sheet)
+        public int? GetTabColor(object nativeSheet)
         {
+            var sheet = nativeSheet as ExcelSheet ?? ExcelSheet.From(nativeSheet);
             var tab = sheet.Tab;
             return Convert.ToInt32(tab.ColorIndex) == (int)Excel.XlColorIndex.xlColorIndexNone
                 ? (int?)null : Convert.ToInt32(tab.Color);
@@ -201,22 +203,22 @@ namespace Sheaside.Services
         public void SetTabColor(OperationTarget target, int? color)
         {
             ValidateTarget(target);
-            if (target.Worksheet == null) throw new InvalidOperationException("シートを選択してください。");
-            if (color.HasValue) target.Worksheet.Tab.Color = color.Value;
-            else target.Worksheet.Tab.ColorIndex = Excel.XlColorIndex.xlColorIndexNone;
+            if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if (color.HasValue) target.Sheet.Tab.Color = color.Value;
+            else target.Sheet.Tab.ColorIndex = Excel.XlColorIndex.xlColorIndexNone;
         }
 
         public void ChangeVisibility(OperationTarget target, WorksheetVisibility expected, string confirmedName = null)
         {
             ValidateTarget(target);
-            if (target.Worksheet == null) throw new InvalidOperationException("シートを選択してください。");
-            if ((int)target.Worksheet.Visible != (int)expected)
+            if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if ((int)target.Sheet.Visible != (int)expected)
                 throw new InvalidOperationException("表示状態が変わりました。一覧を確認して操作をやり直してください。");
-            if (expected == WorksheetVisibility.VeryHidden && target.Worksheet.Name != confirmedName)
+            if (expected == WorksheetVisibility.VeryHidden && target.Sheet.Name != confirmedName)
                 throw new InvalidOperationException("VeryHiddenの再表示には、対象シート名を確認してください。");
             if (expected == WorksheetVisibility.Visible && CountVisibleSheets(target.Workbook) <= 1)
                 throw new InvalidOperationException("最後の表示シートは非表示にできません。");
-            target.Worksheet.Visible = expected == WorksheetVisibility.Visible
+            target.Sheet.Visible = expected == WorksheetVisibility.Visible
                 ? Excel.XlSheetVisibility.xlSheetHidden : Excel.XlSheetVisibility.xlSheetVisible;
         }
 
@@ -235,8 +237,8 @@ namespace Sheaside.Services
         public void EnsureCanDelete(OperationTarget target)
         {
             ValidateTarget(target);
-            if (target.Worksheet == null) throw new InvalidOperationException("シートを選択してください。");
-            if (target.Worksheet.Visible != Excel.XlSheetVisibility.xlSheetVisible) return;
+            if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if (target.Sheet.Visible != Excel.XlSheetVisibility.xlSheetVisible) return;
             int visibleCount = 0;
             var sheets = target.Workbook.Sheets;
             for (int i = 1; i <= sheets.Count; i++)
@@ -251,13 +253,13 @@ namespace Sheaside.Services
         {
             // Recheck after the confirmation dialog: the workbook may have changed.
             EnsureCanDelete(target);
-            if (target.Worksheet.Name != confirmedName)
+            if (target.Sheet.Name != confirmedName)
                 throw new InvalidOperationException("確認中にシート名が変わりました。対象を確認して、もう一度削除してください。");
             bool previousAlerts = application.DisplayAlerts;
             try
             {
                 application.DisplayAlerts = false;
-                target.Worksheet.Delete();
+                target.Sheet.Delete();
             }
             finally { application.DisplayAlerts = previousAlerts; }
         }
@@ -265,17 +267,17 @@ namespace Sheaside.Services
         public MoveSession CaptureMove(int windowHandle, string worksheetId, IList<string> displayedOrder)
         {
             var target = CaptureTarget(windowHandle, worksheetId);
-            if (target.Worksheet == null) throw new InvalidOperationException("移動するシートを選択してください。");
+            if (target.Sheet == null) throw new InvalidOperationException("移動するシートを選択してください。");
             var allSheets = target.Workbook.Sheets;
             var order = new object[allSheets.Count];
             for (int i = 0; i < order.Length; i++) order[i] = allSheets[i + 1];
-            var worksheetObjects = order.OfType<Excel.Worksheet>().ToArray();
+            var worksheetObjects = order.Select(ExcelSheet.From).ToArray();
             var ids = worksheetObjects.Select(GetWorksheetId).ToArray();
             if (!ids.SequenceEqual(displayedOrder))
                 throw new InvalidOperationException("シート一覧が変更されました。更新後にもう一度ドラッグしてください。");
             var session = new MoveSession
             {
-                Target = target, SheetOrder = order, Worksheets = worksheetObjects, WorksheetIds = ids,
+                Target = target, SheetOrder = order, Sheets = worksheetObjects, WorksheetIds = ids,
                 SourceIndex = Array.IndexOf(ids, worksheetId)
             };
             ValidateMove(session);
@@ -295,45 +297,57 @@ namespace Sheaside.Services
             for (int i = 0; i < sheets.Count; i++)
                 if (!Equals(sheets[i + 1], session.SheetOrder[i]))
                     throw new InvalidOperationException("ドラッグ中にシート順が変更されました。もう一度操作してください。");
-            if (!session.Worksheets.Select(GetWorksheetId).SequenceEqual(session.WorksheetIds))
+            if (!session.Sheets.Select(GetWorksheetId).SequenceEqual(session.WorksheetIds))
                 throw new InvalidOperationException("ドラッグ中にシートの識別情報が変わりました。もう一度操作してください。");
         }
 
         public bool MoveWorksheet(MoveSession session, int boundary)
         {
             ValidateMove(session);
-            int destination = WorksheetMoveRules.DestinationIndex(session.SourceIndex, boundary, session.Worksheets.Length);
+            int destination = WorksheetMoveRules.DestinationIndex(session.SourceIndex, boundary, session.Sheets.Length);
             if (destination == session.SourceIndex) return false;
-            var source = session.Target.Worksheet;
-            var anchor = boundary < session.Worksheets.Length ? session.Worksheets[boundary] : session.Worksheets.Last();
+            var source = session.Target.Sheet;
+            var anchor = boundary < session.Sheets.Length ? session.Sheets[boundary] : session.Sheets.Last();
             if (!Equals(source.Parent, session.Target.Workbook) || !Equals(anchor.Parent, session.Target.Workbook))
                 throw new InvalidOperationException("異なるブックへの移動はできません。");
             // Exactly one argument is mandatory; neither would create a NEW workbook.
-            // Chart sheets are not anchors. Preserve their order relative to each other.
+            // Anchors follow the complete Excel tab order, including chart sheets.
             var visibility = source.Visible;
             bool hidden = visibility != Excel.XlSheetVisibility.xlSheetVisible;
+            var anchorVisibility = anchor.Visible;
+            bool anchorHidden = anchorVisibility != Excel.XlSheetVisibility.xlSheetVisible;
+            bool suspendPainting = hidden || anchorHidden;
             bool screenUpdating = application.ScreenUpdating;
-            object previouslyActiveSheet = hidden ? session.Target.Window.ActiveSheet : null;
+            object previouslyActiveSheet = suspendPainting ? session.Target.Window.ActiveSheet : null;
             try
             {
                 // Excel can reject moving a VeryHidden sheet directly. Do not expose
                 // its contents: suspend painting and restore visibility in all cases.
-                if (hidden)
+                if (suspendPainting)
                 {
                     application.ScreenUpdating = false;
-                    source.Visible = Excel.XlSheetVisibility.xlSheetVisible;
+                    if (hidden) source.Visible = Excel.XlSheetVisibility.xlSheetVisible;
+                    // Excel may silently insert BEFORE a hidden After anchor.
+                    if (anchorHidden) anchor.Visible = Excel.XlSheetVisibility.xlSheetVisible;
                     ValidateMove(session);
                 }
-                if (boundary < session.Worksheets.Length) source.Move(Before: anchor);
-                else source.Move(After: anchor);
+                source.Move(anchor, boundary < session.Sheets.Length);
+                var expected = session.SheetOrder.ToList();
+                expected.RemoveAt(session.SourceIndex);
+                expected.Insert(destination, source.Native);
+                var actual = session.Target.Workbook.Sheets;
+                for (int i = 0; i < expected.Count; i++)
+                    if (!Equals(actual[i + 1], expected[i]))
+                        throw new InvalidOperationException("Excelが指定と異なる順序に移動しました。一覧の実際の順序を確認してください。");
             }
             finally
             {
-                if (hidden)
+                if (suspendPainting)
                 {
                     try
                     {
-                        source.Visible = visibility;
+                        try { if (hidden) source.Visible = visibility; }
+                        finally { if (anchorHidden) anchor.Visible = anchorVisibility; }
                         var currentWindow = application.ActiveWindow;
                         if (currentWindow != null && currentWindow.Hwnd == session.Target.WindowHandle)
                         {

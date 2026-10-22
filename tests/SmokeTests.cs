@@ -24,7 +24,8 @@ internal static partial class SmokeTests
             TestReorderRules();
             TestDragControl();
             TestAppearance();
-            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); }
+            TestChartList();
+            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); }
             Console.WriteLine("PASS: " + assertions + " assertions" + (args.Contains("--excel") ? " (including Excel integration)" : " (managed only)"));
             return 0;
         }
@@ -174,7 +175,7 @@ internal static partial class SmokeTests
             Reject(() => service.RenameWorksheet(copyTarget, "Deleted"), "stale worksheet target rejected");
             excel.DisplayAlerts = false;
             var addedTarget = service.CaptureTarget(handle, addedCode);
-            service.DeleteWorksheet(addedTarget, addedTarget.Worksheet.Name);
+            service.DeleteWorksheet(addedTarget, addedTarget.Sheet.Name);
             Check(!excel.DisplayAlerts, "DisplayAlerts false restored");
             int beforeRejectedDelete = book.Sheets.Count;
             Reject(() => service.DeleteWorksheet(target, "Outdated confirmation"), "changed confirmation name rejected");

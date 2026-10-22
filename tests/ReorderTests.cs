@@ -147,10 +147,10 @@ internal static partial class SmokeTests
             int handle = book.Windows[1].Hwnd;
             Func<Excel.Worksheet, ExcelWorksheetService.MoveSession> capture = sheet => service.CaptureMove(handle,
                 service.GetWorksheetId(sheet), service.GetWorksheets(book).Select(item => item.Id).ToArray());
-            Func<string> order = () => string.Join(",", service.GetWorksheets(book).Select(item => item.Name));
+            Func<string> order = () => string.Join(",", service.GetWorksheets(book).Where(item => item.Kind == SheetKind.Worksheet).Select(item => item.Name));
 
             Check(service.MoveWorksheet(capture(d), 0) && order() == "D,A,B,C", "move last to first with charts");
-            Check(service.MoveWorksheet(capture(d), 4) && order() == "A,B,C,D", "move first to last with charts");
+            Check(service.MoveWorksheet(capture(d), book.Sheets.Count) && order() == "A,B,C,D", "move first to last with charts");
             Check(service.MoveWorksheet(capture(c), 1) && order() == "A,C,B,D", "move backward before anchor");
             Check(service.MoveWorksheet(capture(c), 3) && order() == "A,B,C,D", "move forward before anchor");
             book.Saved = true;
@@ -166,11 +166,12 @@ internal static partial class SmokeTests
             Check(excel.ScreenUpdating && service.GetActiveWorksheetId(book.Windows[1]) == activeBeforeHiddenMove, "hidden move restores painting and active sheet");
             b.Visible = Excel.XlSheetVisibility.xlSheetVeryHidden;
             excel.ScreenUpdating = false;
-            Check(service.MoveWorksheet(capture(b), 4) && order() == "A,C,D,B" && b.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden,
+            Check(service.MoveWorksheet(capture(b), book.Sheets.Count) && order() == "A,C,D,B" && b.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden,
                 "VeryHidden worksheet moves to end");
             Check(!excel.ScreenUpdating, "already disabled painting remains disabled");
             excel.ScreenUpdating = true;
-            Check(service.MoveWorksheet(capture(a), 4) && order() == "C,D,B,A" && b.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden,
+            bool movedAfterHidden = service.MoveWorksheet(capture(a), book.Sheets.Count);
+            Check(movedAfterHidden && order() == "C,D,B,A" && b.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden,
                 "move after VeryHidden destination");
             Check(service.MoveWorksheet(capture(a), 0) && order() == "A,C,D,B", "restore order after hidden destination test");
             var stale = capture(a);

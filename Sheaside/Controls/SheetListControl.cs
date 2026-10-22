@@ -30,7 +30,7 @@ namespace Sheaside.Controls
                 IntegralHeight = false,
                 HorizontalScrollbar = true,
                 DisplayMember = "DisplayName",
-                AccessibleName = "ワークシート一覧"
+                AccessibleName = "シート一覧"
             };
             // MouseClick also handles clicking an already selected row (e.g. after a failed activation).
             sheetList.MouseClick += OnSheetClicked;
@@ -134,7 +134,7 @@ namespace Sheaside.Controls
                 if (changed && sheetList.Items.Count > 0)
                     sheetList.TopIndex = Math.Min(Math.Max(0, topIndex), sheetList.Items.Count - 1);
                 if (changed || statusLabel.Text.Length == 0)
-                    statusLabel.Text = worksheets.Count == 0 ? "ワークシートがありません。" : "クリック、または選択して Enter で切り替えます。";
+                    statusLabel.Text = worksheets.Count == 0 ? "シートがありません。" : "クリック、または選択して Enter で切り替えます。";
             }
             finally
             {
@@ -147,7 +147,7 @@ namespace Sheaside.Controls
 
         private static bool SameItem(WorksheetItem left, WorksheetItem right)
         {
-            return left.Id == right.Id && left.Name == right.Name && left.Visibility == right.Visibility && left.TabColor == right.TabColor;
+            return left.Id == right.Id && left.Name == right.Name && left.Kind == right.Kind && left.Visibility == right.Visibility && left.TabColor == right.TabColor;
         }
 
         private void RequestCommand(WorksheetCommand command, WorksheetItem worksheet)

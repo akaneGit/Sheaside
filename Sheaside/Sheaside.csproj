@@ -216,6 +216,7 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Services\ExcelWorksheetService.cs" />
+    <Compile Include="Services\ExcelSheet.cs" />
     <Compile Include="Services\WorksheetNameRules.cs" />
     <Compile Include="Controls\RenameSheetDialog.cs">
       <SubType>Form</SubType>
