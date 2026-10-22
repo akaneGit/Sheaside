@@ -1,4 +1,4 @@
-# Sheaside v0.3
+# Sheaside v0.4
 
 Excelの右側にワークシート一覧を表示するVSTOアドインです。既存のVisual Studioソリューションと.NET Framework 4.8プロジェクトを使用しています。
 
@@ -9,8 +9,10 @@ Excelの右側にワークシート一覧を表示するVSTOアドインです�
 - ブック／ウィンドウの切り替え時と、Excel側でのシート切り替え時に一覧を更新します。
 - リボンの［Sheaside］タブ → ［Sheaside］ボタンで、そのウィンドウのパネルを表示・非表示にします。パネルの×ボタンとも状態を同期します。
 - ウィンドウのHwndごとにパネルを管理します。同じブックの［新しいウィンドウを開く］にも対応する構成です。新しいウィンドウでは初期表示し、表示状態の永続保存は行いません。
-- Excelにウィンドウ終了後・シート名変更の専用イベントがないため、1秒ごとのWinFormsタイマーでも実際のウィンドウと表示中の一覧を照合します。閉じる操作のキャンセル時にはパネルを削除しません。
-- 非表示／VeryHiddenシートには「（非表示）」を付けます。クリックしても再表示せず、パネル内で案内します。グラフシートは一覧の対象外です。
+- イベントでの更新に加え、Excelが前面・操作可能で、アクティブウィンドウのパネルが表示されている場合だけ、3秒間隔で状態を照合します。タイマーによるシート取得はそのウィンドウに限定し、背面の一覧はウィンドウ切り替え時に更新します。ドラッグ中は構成検証のみ行います。
+- Hiddenには「（非表示）」、VeryHiddenには「（VeryHidden）」を付けます。クリックしても再表示せず、右クリック操作を案内します。選択行は背景色、実際のアクティブシートは「●」で区別します。グラフシートは一覧の対象外です。
+- 右クリックで表示シートを非表示に、Hiddenを再表示できます。VeryHiddenは専用の［VeryHiddenを再表示…］でシート名の確認が必要です。最後の表示シートは非表示にできません（表示中のグラフシートも数えます）。
+- 行左側の小さな色見本にExcelのタブ色を表示します。［タブの色］→［色を選択…］で変更し、［色なし］で解除できます。色なしと黒を区別し、文字色・選択背景はWindowsのシステム色を使用します。挿入ラインは行描画の後に縁付きで描画します。
 - 一覧のダブルクリックで名前を変更します。現在の名前を初期表示し、入力エラー時はダイアログ内で修正できます。
 - 一覧の右クリックメニューから追加・名前変更・複製・削除を行えます。右クリックした行が対象になり、空白部分では追加のみ利用できます。
 - 一覧上部の［+ シートを追加］でも追加できます。選択シートの直後、未選択の場合はブック末尾に追加します。複製は必ず元シートの直後です。
@@ -31,17 +33,15 @@ Excelの右側にワークシート一覧を表示するVSTOアドインです�
 
 | ファイル | 区分 | 役割 |
 | --- | --- | --- |
-| `Sheaside/Sheaside.csproj` | v0.3変更 | 新しいソースの登録 |
-| `Sheaside/Controls/SheetListControl.cs` | v0.3変更 | ドラッグイベントの接続、ドラッグ中の更新保留 |
-| `Sheaside/Controls/ReorderableSheetListBox.cs` | v0.3新規 | 既存ListBoxを継承したドラッグUI、挿入ライン、自動スクロール |
-| `Sheaside/Models/WorksheetDragEventArgs.cs` | v0.3新規 | Excel非依存の開始・ドロップイベント引数 |
-| `Sheaside/Services/ExcelWorksheetService.cs` | v0.3変更 | ドラッグ時の対象固定・再検証、Worksheet.Move、非表示状態復元 |
-| `Sheaside/Services/WorksheetMoveRules.cs` | v0.3新規 | 挿入位置・移動先インデックス・無変更判定 |
-| `Sheaside/Services/SheetPaneManager.cs` | v0.3変更 | ドラッグの開始・中止・完了、例外処理、実際の順序の再取得 |
-| `tests/SmokeTests.cs` | v0.3変更 | 既存回帰テストから並び替えテストも呼び出し |
-| `tests/ReorderTests.cs` | v0.3新規 | 境界値・ドラッグUI・実Excelの並び替えテスト |
-| `tools/Test-Sheaside.ps1` | v0.3変更 | 追加ソース・テストのコンパイル |
-| `README.md` | v0.3変更 | 仕様と検証手順 |
+| `Sheaside/Models/WorksheetItem.cs` | v0.4変更 | 3種類の表示状態・未設定を区別したタブ色・操作種別 |
+| `Sheaside/Controls/SheetListControl.cs` | v0.4変更 | 状態別メニュー、色と状態の差分更新、選択・スクロール維持 |
+| `Sheaside/Controls/ReorderableSheetListBox.cs` | v0.4変更 | 色見本・アクティブ表示の行描画、挿入ラインの縁取り |
+| `Sheaside/Services/ExcelWorksheetService.cs` | v0.4変更 | 表示状態・色の取得変更、最後の表示シートと確認後の検証 |
+| `Sheaside/Services/SheetPaneManager.cs` | v0.4変更 | 確認・色選択ダイアログ、例外処理、条件付き同期 |
+| `tests/AppearanceTests.cs` | v0.4新規 | 表示状態・描画・色・複数ウィンドウ・操作拒否の検証 |
+| `tests/SmokeTests.cs` | v0.4変更 | 新規テストの呼び出し |
+| `tools/Test-Sheaside.ps1` | v0.4変更 | 新規テストのコンパイル |
+| `README.md` | v0.4変更 | 仕様・制約・検証手順 |
 
 既存の`*.Designer.cs`、`ThisAddIn.Designer.xml`、ソリューションファイルは変更していません。UIはUserControl内のコードで構築し、リボンにはRibbon XMLを使用しています。
 
@@ -113,15 +113,40 @@ powershell.exe -NoProfile -File .\tools\New-DevelopmentCertificate.ps1
 
 スクリプトは既存の証明書を上書きしません。証明書を生成すると、プロジェクト内の`ManifestCertificateThumbprint`も更新します。秘密鍵を含むPFXはGit管理から除外しています。通常のVSTOビルドでは、標準のOfficeToolsターゲットが開発用証明書の処理と現在のユーザーへのアドイン登録を行います。
 
+## v0.4のMicrosoft 365実機確認
+
+Visual StudioのDebug / Any CPUでF5起動し、保存不要なテスト用ブックで確認します。
+
+1. 3枚以上のシートを用意し、一覧の選択背景と、アクティブシートの「●」を確認します。右クリックで別行を選ぶと「●」は実際のアクティブ行に残ります。
+2. ［非表示にする］でHiddenに変更し、「（非表示）」表示・選択維持を確認します。クリック・Enterでも再表示されず、操作案内が出ることを確認します。［再表示］で元に戻します。
+3. VBAエディターの対象ワークシートのプロパティでVisibleを`2 - xlSheetVeryHidden`に設定し、Excelに戻ります。「（VeryHidden）」が表示され、通常の［再表示］が無効になることを確認します。
+4. ［VeryHiddenを再表示…］で対象名と既定の［いいえ］を確認します。キャンセルで変化せず、［はい］で表示状態になることを確認します。
+5. 表示シートが1枚になるまで隠し、最後の1枚の非表示が拒否されることを確認します。表示中のグラフシートがあれば、最後の表示ワークシートは隠せます。
+6. ［タブの色］で赤・黒・白・任意のRGB色を選び、Excelのタブと行左側の色見本が一致することを確認します。色なしに戻し、文字と選択状態が読みやすいことを確認します。色ダイアログのキャンセルも確認します。
+7. Excel側で色・表示状態を変更し、通常のExcel画面に戻って約3秒以内、またはシート／ウィンドウ切り替えで反映されることを確認します。パネル非表示中や他アプリが前面の間は更新せず、戻ったときに反映します。
+8. 2つのブックと同じブックの2つのウィンドウを開き、同名シートにも別々の色・状態を設定します。対象のブックだけが変わり、同じブックのもう一方の一覧は切り替え時に同期することを確認します。
+9. ブック構成の保護・読み取り専用で色と表示状態の変更が拒否され、一覧選択・リボンの表示切り替えは維持されることを確認します。
+10. 多数の行でスクロールした位置から色・表示状態を変更し、選択とスクロール位置が維持されることを確認します。長い日本語名、Windows高コントラスト／拡大表示でも確認します。
+11. 色付き・Hidden・VeryHiddenの行を前後・先頭末尾へドラッグし、挿入ラインが見えること、色・表示状態・選択が維持されることを確認します。Esc中止・ブック切り替え中止も確認します。
+12. 追加・名前変更・複製・削除、Excel側のアクティブ同期、リボン切り替え、および上記v0.3の確認を再実施します。
+
+### v0.4の既知の制約
+
+- 表示状態・タブ色の専用変更イベントがないため、イベントが発生しない変更には最大約3秒の遅延があります。セル編集中・ダイアログ中はExcelが呼び出しを拒否する場合があり、操作可能になった後に再取得します。
+- WinFormsの標準表示はWindowsのシステム色に従います。Office独自のダークテーマには連動しません。Excelのテーマ色は現在の解決済みRGBを表示し、色選択ダイアログからの設定は固定RGBです。
+- グラフシートは一覧・色設定の対象外ですが、最後の表示シート判定には含みます。VeryHiddenへ変更する機能はありません。
+- 読み取り専用・構成保護・従来の共有ブックでは、色変更も含めて管理操作を拒否します。
+- v0.4のMicrosoft 365でのUI実機検証は未実施です。自動テスト環境はExcel 2013です。
+
 ## 検証記録
 
 - Visual Studio 2026付属MSBuildで、ソリューションのDebug / Releaseビルドに成功。
 - `Sheaside.dll`、`Sheaside.dll.manifest`、`Sheaside.vsto`を生成。
-- v0.2までの機能はMicrosoft 365上でユーザー側の実機確認済みです。
-- v0.3は既存回帰テストを含む277項目の自動チェックに成功（実Excel部分はExcel 2013 / 15.0）。
+- v0.3までの機能はMicrosoft 365上でユーザー側の全17項目の実機確認済みです。
+- v0.4は既存回帰テストを含む307項目の自動チェックに成功（実Excel部分はExcel 2013 / 15.0）。表示状態、確認の迂回拒否、最後の表示シート、色の往復・リセット・テーマ色読取、複数ブック／ウィンドウ、読み取り専用・構成保護・閉じた対象の拒否を含みます。
 - 1～7枚の全移動元×全挿入位置、ドラッグ開始閾値・上半分／下半分・空白ドロップ・外部トークン拒否・中止・選択維持を検証しました。
 - 実Excelで前後・先頭末尾・無変更・Hidden／VeryHidden・非表示の移動先・グラフシート共存・構成保護・途中のシート構成変更・ブック／ウィンドウ切り替え拒否・複数ブックそれぞれの移動・画面更新設定復元を検証しました。
-- 自動チェックは制御イベントとInterop操作の検証です。Microsoft 365上でのv0.3の実マウス操作、挿入ラインの見え方、自動スクロール、リボンを含む操作は未確認です。上記の手順で確認してください。
+- 自動チェックは制御イベントとInterop操作の検証です。v0.4の確認ダイアログ、色選択ダイアログ、実マウス操作と挿入ラインの見え方は上記の実機手順で確認してください。
 
 コマンドラインでのDebugビルド例:
 
@@ -133,5 +158,7 @@ powershell.exe -NoProfile -File .\tools\New-DevelopmentCertificate.ps1
 タスクペインはウィンドウを明示して作成し、終了時にはVSTO自身に破棄を任せます。このライフサイクルとRibbon XMLの接続は、Microsoftの[カスタムタスクペイン](https://learn.microsoft.com/en-us/visualstudio/vsto/custom-task-panes)と[Ribbon XML](https://learn.microsoft.com/en-us/visualstudio/vsto/ribbon-xml)の説明を参照しています。
 
 名前の基本制約はMicrosoftの[ワークシート名の規則](https://support.microsoft.com/en-gb/excel/rename-a-worksheet)を参照しています。
+
+タブ色は[Tab.ColorIndex](https://learn.microsoft.com/en-us/office/vba/api/excel.tab.colorindex)で色なしを判別し、[Tab.Color](https://learn.microsoft.com/en-us/office/vba/api/excel.tab.color)で現在のRGB色を取得・設定します。
 
 並び替えは[Worksheet.Move](https://learn.microsoft.com/en-us/office/vba/api/excel.worksheet.move)のBefore／Afterの片方を必ず指定します。ドラッグの開始閾値とキャンセルはWinFormsの[DoDragDrop](https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.control.dodragdrop)と[ドラッグ＆ドロップイベント](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/input-mouse/drag-and-drop)に沿って実装しています。

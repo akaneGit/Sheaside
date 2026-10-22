@@ -2,20 +2,28 @@ using System;
 
 namespace Sheaside.Models
 {
+    internal enum WorksheetVisibility { Visible = -1, Hidden = 0, VeryHidden = 2 }
     // Only managed values cross the boundary between Excel and the view.
     internal sealed class WorksheetItem
     {
         public WorksheetItem(string worksheetId, string name, bool isVisible)
+            : this(worksheetId, name, isVisible ? WorksheetVisibility.Visible : WorksheetVisibility.Hidden, null) { }
+
+        public WorksheetItem(string worksheetId, string name, WorksheetVisibility visibility, int? tabColor)
         {
             Id = worksheetId;
             Name = name;
-            IsVisible = isVisible;
+            Visibility = visibility;
+            TabColor = tabColor;
         }
 
         public string Id { get; private set; }
         public string Name { get; private set; }
-        public bool IsVisible { get; private set; }
-        public string DisplayName { get { return IsVisible ? Name : Name + "（非表示）"; } }
+        public WorksheetVisibility Visibility { get; private set; }
+        // OLE RGB value; null is different from black (0).
+        public int? TabColor { get; private set; }
+        public bool IsVisible { get { return Visibility == WorksheetVisibility.Visible; } }
+        public string DisplayName { get { return IsVisible ? Name : Name + (Visibility == WorksheetVisibility.VeryHidden ? "（VeryHidden）" : "（非表示）"); } }
     }
 
     internal sealed class WorksheetRequestedEventArgs : EventArgs
@@ -24,7 +32,7 @@ namespace Sheaside.Models
         public WorksheetItem Worksheet { get; private set; }
     }
 
-    internal enum WorksheetCommand { Add, Rename, Duplicate, Delete }
+    internal enum WorksheetCommand { Add, Rename, Duplicate, Delete, Hide, Unhide, RevealVeryHidden, SetTabColor, ClearTabColor }
 
     internal sealed class WorksheetCommandEventArgs : EventArgs
     {

@@ -18,15 +18,59 @@ namespace Sheaside.Controls
         private int insertionBoundary = -1;
         private bool cancelled;
         private bool consumedClick;
+        private string activeWorksheetId;
 
         public ReorderableSheetListBox()
         {
             AllowDrop = true;
+            DrawMode = DrawMode.OwnerDrawFixed;
+            ItemHeight = Font.Height + 10;
             scrollTimer = new Timer { Interval = 120 };
             scrollTimer.Tick += ScrollDuringDrag;
         }
 
         public bool IsDragging { get; private set; }
+        public void SetActiveWorksheet(string id)
+        {
+            if (activeWorksheetId == id) return;
+            string previous = activeWorksheetId;
+            activeWorksheetId = id;
+            for (int i = 0; i < Items.Count; i++)
+                if (((WorksheetItem)Items[i]).Id == id || ((WorksheetItem)Items[i]).Id == previous)
+                    Invalidate(GetItemRectangle(i));
+        }
+
+        public void UpdateTextExtent()
+        {
+            HorizontalExtent = Items.Cast<WorksheetItem>().Select(item =>
+                TextRenderer.MeasureText("● " + item.DisplayName, Font).Width + 28).DefaultIfEmpty(0).Max();
+        }
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            base.OnFontChanged(e);
+            ItemHeight = Font.Height + 10;
+            UpdateTextExtent();
+        }
+
+        protected override void OnDrawItem(DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Index >= Items.Count) return;
+            var item = (WorksheetItem)Items[e.Index];
+            e.DrawBackground();
+            bool selected = (e.State & DrawItemState.Selected) != 0;
+            Color text = selected ? SystemColors.HighlightText : SystemColors.WindowText;
+            var swatch = new Rectangle(e.Bounds.Left + 5, e.Bounds.Top + 5, 10, Math.Max(5, e.Bounds.Height - 10));
+            using (var brush = new SolidBrush(item.TabColor.HasValue ? ColorTranslator.FromOle(item.TabColor.Value) : SystemColors.Window))
+                e.Graphics.FillRectangle(brush, swatch);
+            using (var pen = new Pen(selected ? SystemColors.HighlightText : SystemColors.WindowText))
+                e.Graphics.DrawRectangle(pen, swatch);
+            string caption = (item.Id == activeWorksheetId ? "● " : "　 ") + item.DisplayName;
+            var bounds = new Rectangle(e.Bounds.Left + 22, e.Bounds.Top, Math.Max(0, e.Bounds.Width - 22), e.Bounds.Height);
+            TextRenderer.DrawText(e.Graphics, caption, Font, bounds, text,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+            e.DrawFocusRectangle();
+        }
         public event EventHandler<WorksheetDragStartingEventArgs> DragStarting;
         public event EventHandler<WorksheetDropEventArgs> DropRequested;
         public event EventHandler DragCompleted;
@@ -200,7 +244,9 @@ namespace Sheaside.Controls
             if (y < 0) return;
             using (var graphics = Graphics.FromHwnd(Handle))
             using (var pen = new Pen(SystemColors.Highlight, 2))
+            using (var outline = new Pen(SystemColors.Window, 4))
             {
+                graphics.DrawLine(outline, 2, y, ClientSize.Width - 3, y);
                 graphics.DrawLine(pen, 2, y, ClientSize.Width - 3, y);
                 graphics.DrawLine(pen, 2, y - 3, 2, y + 3);
                 graphics.DrawLine(pen, ClientSize.Width - 3, y - 3, ClientSize.Width - 3, y + 3);

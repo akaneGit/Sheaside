@@ -13,6 +13,7 @@ if (-not (Test-Path -LiteralPath $interop)) { throw 'Build the Debug configurati
 $sources = @(
     'tests/SmokeTests.cs',
     'tests/ReorderTests.cs',
+    'tests/AppearanceTests.cs',
     'Sheaside/Models/WorksheetItem.cs',
     'Sheaside/Models/WorksheetDragEventArgs.cs',
     'Sheaside/Controls/ReorderableSheetListBox.cs',

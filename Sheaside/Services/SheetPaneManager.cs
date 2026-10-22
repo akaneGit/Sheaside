@@ -45,9 +45,9 @@ namespace Sheaside.Services
             this.application = application;
             this.taskPanes = taskPanes;
             worksheets = new ExcelWorksheetService(application);
-            // Excel has no WindowClosed or WorksheetRenamed event. A UI-thread timer
-            // reconciles actual windows after a close/save dialog (including Cancel).
-            refreshTimer = new Timer { Interval = 1000 };
+            // Events handle activation immediately; a conditional UI-thread timer
+            // covers changes without dedicated events (visibility, tab color, close).
+            refreshTimer = new Timer { Interval = 3000 };
             refreshTimer.Tick += OnRefresh;
         }
 
@@ -85,7 +85,25 @@ namespace Sheaside.Services
             catch (COMException exception) { Trace.TraceWarning("Sheaside: {0}", exception); }
         }
 
-        private void OnRefresh(object sender, EventArgs e) { Refresh(); }
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        private void OnRefresh(object sender, EventArgs e)
+        {
+            if (disposed || operating) return;
+            if (draggingEntry != null) { Refresh(); return; }
+            try
+            {
+                // No visibility/tab-color events exist. Reconcile only while Excel
+                // is foreground, ready, and its active window's pane is visible.
+                var window = application.ActiveWindow;
+                PaneEntry entry;
+                if (window == null || GetForegroundWindow() != new IntPtr(window.Hwnd) || !application.Ready ||
+                    !entries.TryGetValue(window.Hwnd, out entry) || !entry.Pane.Visible || entry.View.IsMenuOpen) return;
+                Refresh(window.Hwnd);
+            }
+            catch (Exception exception) when (IsOperationError(exception)) { Trace.TraceWarning("Sheaside timer: {0}", exception.Message); }
+        }
         private void OnWindowActivate(Excel.Workbook workbook, Excel.Window window)
         {
             if (!operating) CancelCurrentDrag("ウィンドウが切り替わったため、並び替えを中止しました。");
@@ -102,7 +120,7 @@ namespace Sheaside.Services
         }
         private void OnSheetActivate(object sheet) { Refresh(); }
 
-        private void Refresh()
+        private void Refresh(int? onlyHandle = null)
         {
             if (disposed || refreshing || operating) return;
             if (draggingEntry != null)
@@ -130,6 +148,7 @@ namespace Sheaside.Services
                     PaneEntry entry;
                     if (!entries.TryGetValue(handle, out entry)) entry = CreatePane(window, handle);
                     if (!entry.Pane.Visible || entry.View.IsMenuOpen) continue;
+                    if (onlyHandle.HasValue && onlyHandle.Value != handle) continue;
                     var workbook = worksheets.GetWorkbook(window);
                     if (workbook != null)
                     {
@@ -146,7 +165,7 @@ namespace Sheaside.Services
                     StateChanged?.Invoke(this, EventArgs.Empty);
                 }
             }
-            catch (COMException exception)
+            catch (Exception exception) when (IsOperationError(exception))
             {
                 // Excel may reject calls while editing a cell or displaying a dialog.
                 // Keep the last good list and retry on the next UI-thread tick.
@@ -209,8 +228,43 @@ namespace Sheaside.Services
             try
             {
                 var target = worksheets.CaptureTarget(handle, args.Worksheet?.Id);
+                if (args.Worksheet != null) entry.PreferredSelection = args.Worksheet.Id;
                 switch (args.Command)
                 {
+                    case WorksheetCommand.Hide:
+                        worksheets.ChangeVisibility(target, WorksheetVisibility.Visible);
+                        status = "シートを非表示にしました。";
+                        break;
+                    case WorksheetCommand.Unhide:
+                        worksheets.ChangeVisibility(target, WorksheetVisibility.Hidden);
+                        status = "シートを再表示しました。";
+                        break;
+                    case WorksheetCommand.RevealVeryHidden:
+                        string revealName = target.Worksheet.Name;
+                        if (MessageBox.Show(entry.View, "VeryHiddenのシート「" + revealName + "」を再表示しますか？",
+                            "Sheaside — VeryHiddenの再表示", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                            MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+                        {
+                            worksheets.ChangeVisibility(target, WorksheetVisibility.VeryHidden, revealName);
+                            status = "VeryHiddenのシートを再表示しました。";
+                        }
+                        break;
+                    case WorksheetCommand.SetTabColor:
+                        using (var dialog = new ColorDialog { FullOpen = true })
+                        {
+                            int? color = worksheets.GetTabColor(target.Worksheet);
+                            dialog.Color = color.HasValue ? System.Drawing.ColorTranslator.FromOle(color.Value) : System.Drawing.SystemColors.Window;
+                            if (dialog.ShowDialog(entry.View) == DialogResult.OK)
+                            {
+                                worksheets.SetTabColor(target, System.Drawing.ColorTranslator.ToOle(dialog.Color));
+                                status = "タブの色を変更しました。";
+                            }
+                        }
+                        break;
+                    case WorksheetCommand.ClearTabColor:
+                        worksheets.SetTabColor(target, null);
+                        status = "タブの色を「色なし」にしました。";
+                        break;
                     case WorksheetCommand.Add:
                         entry.PreferredSelection = worksheets.AddWorksheet(target);
                         status = "シートを追加しました。";

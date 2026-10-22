@@ -23,7 +23,8 @@ internal static partial class SmokeTests
             TestRenameDialog();
             TestReorderRules();
             TestDragControl();
-            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); }
+            TestAppearance();
+            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); }
             Console.WriteLine("PASS: " + assertions + " assertions" + (args.Contains("--excel") ? " (including Excel integration)" : " (managed only)"));
             return 0;
         }

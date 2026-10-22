@@ -46,10 +46,20 @@ namespace Sheaside.Controls
             sheetMenu.Items.Add("名前の変更", null, (sender, args) => RequestCommand(WorksheetCommand.Rename, menuTarget));
             sheetMenu.Items.Add("シートの複製", null, (sender, args) => RequestCommand(WorksheetCommand.Duplicate, menuTarget));
             sheetMenu.Items.Add("シートの削除", null, (sender, args) => RequestCommand(WorksheetCommand.Delete, menuTarget));
+            var hide = sheetMenu.Items.Add("非表示にする", null, (sender, args) => RequestCommand(WorksheetCommand.Hide, menuTarget));
+            var unhide = sheetMenu.Items.Add("再表示", null, (sender, args) => RequestCommand(WorksheetCommand.Unhide, menuTarget));
+            var reveal = sheetMenu.Items.Add("VeryHiddenを再表示…", null, (sender, args) => RequestCommand(WorksheetCommand.RevealVeryHidden, menuTarget));
+            var colors = new ToolStripMenuItem("タブの色");
+            colors.DropDownItems.Add("色を選択…", null, (sender, args) => RequestCommand(WorksheetCommand.SetTabColor, menuTarget));
+            colors.DropDownItems.Add("色なし", null, (sender, args) => RequestCommand(WorksheetCommand.ClearTabColor, menuTarget));
+            sheetMenu.Items.Add(colors);
             sheetMenu.Opening += (sender, args) =>
             {
                 menuTarget = sheetList.SelectedItem as WorksheetItem;
                 for (int i = 1; i < sheetMenu.Items.Count; i++) sheetMenu.Items[i].Enabled = menuTarget != null;
+                hide.Enabled = menuTarget?.Visibility == WorksheetVisibility.Visible;
+                unhide.Enabled = menuTarget?.Visibility == WorksheetVisibility.Hidden;
+                reveal.Enabled = menuTarget?.Visibility == WorksheetVisibility.VeryHidden;
             };
             sheetList.MouseDown += (sender, args) =>
             {
@@ -104,6 +114,7 @@ namespace Sheaside.Controls
             for (int i = 0; !changed && i < worksheets.Count; i++)
                 changed = !SameItem((WorksheetItem)sheetList.Items[i], worksheets[i]);
             lastActiveId = activeId;
+            sheetList.SetActiveWorksheet(activeId);
             hasSnapshot = true;
             if (!changed && sheetList.SelectedIndex == selectedIndex) return;
             updating = true;
@@ -117,6 +128,7 @@ namespace Sheaside.Controls
                     else if (!SameItem((WorksheetItem)sheetList.Items[i], worksheets[i])) sheetList.Items[i] = worksheets[i];
                 }
                 while (sheetList.Items.Count > worksheets.Count) sheetList.Items.RemoveAt(sheetList.Items.Count - 1);
+                sheetList.UpdateTextExtent();
 
                 sheetList.SelectedIndex = selectedIndex;
                 if (changed && sheetList.Items.Count > 0)
@@ -135,7 +147,7 @@ namespace Sheaside.Controls
 
         private static bool SameItem(WorksheetItem left, WorksheetItem right)
         {
-            return left.Id == right.Id && left.Name == right.Name && left.IsVisible == right.IsVisible;
+            return left.Id == right.Id && left.Name == right.Name && left.Visibility == right.Visibility && left.TabColor == right.TabColor;
         }
 
         private void RequestCommand(WorksheetCommand command, WorksheetItem worksheet)

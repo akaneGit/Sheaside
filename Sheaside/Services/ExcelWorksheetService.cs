@@ -66,7 +66,7 @@ namespace Sheaside.Services
             for (int i = 1; i <= worksheets.Count; i++)
             {
                 var sheet = (Excel.Worksheet)worksheets[i];
-                result.Add(new WorksheetItem(GetWorksheetId(sheet), sheet.Name, sheet.Visible == Excel.XlSheetVisibility.xlSheetVisible));
+                result.Add(new WorksheetItem(GetWorksheetId(sheet), sheet.Name, (WorksheetVisibility)(int)sheet.Visible, GetTabColor(sheet)));
             }
             return result;
         }
@@ -99,7 +99,9 @@ namespace Sheaside.Services
                 var sheet = (Excel.Worksheet)worksheets[i];
                 if (GetWorksheetId(sheet) != codeName) continue;
                 if (sheet.Visible != Excel.XlSheetVisibility.xlSheetVisible)
-                    return "非表示のシートには切り替えられません。Excelで再表示してください。";
+                    return sheet.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden
+                        ? "VeryHiddenのシートです。右クリックの「VeryHiddenを再表示…」で確認して再表示できます。"
+                        : "非表示のシートです。右クリックの「再表示」から表示できます。";
                 window.Activate();
                 sheet.Activate();
                 return "シート「" + sheet.Name + "」に切り替えました。";
@@ -187,6 +189,47 @@ namespace Sheaside.Services
             target.Worksheet.Copy(After: target.Worksheet);
             var copy = (Excel.Worksheet)target.Worksheet.Next;
             return GetWorksheetId(copy);
+        }
+
+        public int? GetTabColor(Excel.Worksheet sheet)
+        {
+            var tab = sheet.Tab;
+            return Convert.ToInt32(tab.ColorIndex) == (int)Excel.XlColorIndex.xlColorIndexNone
+                ? (int?)null : Convert.ToInt32(tab.Color);
+        }
+
+        public void SetTabColor(OperationTarget target, int? color)
+        {
+            ValidateTarget(target);
+            if (target.Worksheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if (color.HasValue) target.Worksheet.Tab.Color = color.Value;
+            else target.Worksheet.Tab.ColorIndex = Excel.XlColorIndex.xlColorIndexNone;
+        }
+
+        public void ChangeVisibility(OperationTarget target, WorksheetVisibility expected, string confirmedName = null)
+        {
+            ValidateTarget(target);
+            if (target.Worksheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if ((int)target.Worksheet.Visible != (int)expected)
+                throw new InvalidOperationException("表示状態が変わりました。一覧を確認して操作をやり直してください。");
+            if (expected == WorksheetVisibility.VeryHidden && target.Worksheet.Name != confirmedName)
+                throw new InvalidOperationException("VeryHiddenの再表示には、対象シート名を確認してください。");
+            if (expected == WorksheetVisibility.Visible && CountVisibleSheets(target.Workbook) <= 1)
+                throw new InvalidOperationException("最後の表示シートは非表示にできません。");
+            target.Worksheet.Visible = expected == WorksheetVisibility.Visible
+                ? Excel.XlSheetVisibility.xlSheetHidden : Excel.XlSheetVisibility.xlSheetVisible;
+        }
+
+        private static int CountVisibleSheets(Excel.Workbook workbook)
+        {
+            int count = 0;
+            var sheets = workbook.Sheets;
+            for (int i = 1; i <= sheets.Count; i++)
+            {
+                dynamic sheet = sheets[i];
+                if ((int)sheet.Visible == (int)Excel.XlSheetVisibility.xlSheetVisible) count++;
+            }
+            return count;
         }
 
         public void EnsureCanDelete(OperationTarget target)

@@ -1,0 +1,131 @@
+using System;
+using System.Drawing;
+using System.Linq;
+using System.Reflection;
+using System.ComponentModel;
+using System.Windows.Forms;
+using Sheaside.Controls;
+using Sheaside.Models;
+using Sheaside.Services;
+using Excel = Microsoft.Office.Interop.Excel;
+
+internal static partial class SmokeTests
+{
+    private static void TestAppearance()
+    {
+        using (var view = new SheetListControl { Size = new Size(260, 400) })
+        {
+            var list = view.Controls.OfType<ListBox>().Single();
+            var rows = Enumerable.Range(0, 40).Select(i => new WorksheetItem("s" + i, "Sheet " + i, true)).ToArray();
+            view.ShowWorksheets("Book", rows, "s0");
+            list.SelectedIndex = 20;
+            list.TopIndex = 18;
+            int top = list.TopIndex;
+            rows[20] = new WorksheetItem("s20", "Sheet 20", WorksheetVisibility.VeryHidden, 0);
+            view.ShowWorksheets("Book", rows, "s0");
+            Check(list.SelectedIndex == 20 && list.TopIndex == top, "appearance preserves selection and scroll");
+            Check(((WorksheetItem)list.Items[20]).DisplayName.Contains("VeryHidden"), "VeryHidden label");
+            Check(((WorksheetItem)list.Items[20]).TabColor == 0, "black is not no color");
+            var menu = list.ContextMenuStrip;
+            typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(menu, new object[] { new CancelEventArgs() });
+            Check(!menu.Items[4].Enabled && !menu.Items[5].Enabled && menu.Items[6].Enabled, "VeryHidden has dedicated menu");
+            rows[20] = new WorksheetItem("s20", "Sheet 20", WorksheetVisibility.Hidden, null);
+            view.ShowWorksheets("Book", rows, "s0");
+            Check(((WorksheetItem)list.Items[20]).DisplayName.Contains("非表示"), "Hidden label distinct");
+            typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(menu, new object[] { new CancelEventArgs() });
+            Check(!menu.Items[4].Enabled && menu.Items[5].Enabled && !menu.Items[6].Enabled, "Hidden menu excludes VeryHidden reveal");
+            using (var bitmap = new Bitmap(260, 400))
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                typeof(ReorderableSheetListBox).GetMethod("OnDrawItem", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(list, new object[] { new DrawItemEventArgs(graphics, list.Font, new Rectangle(0, 0, 260, list.ItemHeight), 20, DrawItemState.Selected) });
+                Check(bitmap.GetPixel(7, 7).ToArgb() == SystemColors.Window.ToArgb(), "unset swatch uses system theme");
+            }
+        }
+    }
+
+    private static void TestExcelAppearance()
+    {
+        var excel = new Excel.Application { Visible = false, DisplayAlerts = false };
+        Excel.Workbook book = null;
+        Excel.Workbook other = null;
+        Excel.Workbook readOnly = null;
+        string file = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appearance-" + Guid.NewGuid().ToString("N") + ".xlsx");
+        try
+        {
+            book = excel.Workbooks.Add();
+            var service = new ExcelWorksheetService(excel);
+            var first = (Excel.Worksheet)book.Worksheets[1];
+            var second = (Excel.Worksheet)book.Worksheets.Add(After: first);
+            int handle = book.Windows[1].Hwnd;
+            var target = service.CaptureTarget(handle, service.GetWorksheetId(second));
+            foreach (var color in new[] { Color.Black, Color.Red, Color.FromArgb(12, 45, 210) })
+            {
+                int ole = ColorTranslator.ToOle(color);
+                service.SetTabColor(target, ole);
+                Check(service.GetWorksheets(book).Single(i => i.Id == service.GetWorksheetId(second)).TabColor == ole, "tab color roundtrip " + color);
+            }
+            service.SetTabColor(target, null);
+            Check(service.GetTabColor(second) == null, "reset color");
+            second.Tab.ThemeColor = Excel.XlThemeColor.xlThemeColorAccent1;
+            Check(service.GetTabColor(second) == Convert.ToInt32(second.Tab.Color), "theme resolves actual color");
+            service.ChangeVisibility(target, WorksheetVisibility.Visible);
+            Check(second.Visible == Excel.XlSheetVisibility.xlSheetHidden, "hide");
+            service.ActivateWorksheet(handle, service.GetWorksheetId(second));
+            Check(second.Visible == Excel.XlSheetVisibility.xlSheetHidden, "click never reveals hidden");
+            service.ChangeVisibility(target, WorksheetVisibility.Hidden);
+            Check(second.Visible == Excel.XlSheetVisibility.xlSheetVisible, "unhide");
+            second.Visible = Excel.XlSheetVisibility.xlSheetVeryHidden;
+            Check(service.GetWorksheets(book).Single(i => i.Id == service.GetWorksheetId(second)).Visibility == WorksheetVisibility.VeryHidden, "read VeryHidden");
+            Reject(() => service.ChangeVisibility(target, WorksheetVisibility.Hidden), "stale normal reveal cannot bypass confirmation");
+            Reject(() => service.ChangeVisibility(target, WorksheetVisibility.VeryHidden), "VeryHidden requires confirmation name");
+            Reject(() => service.ChangeVisibility(target, WorksheetVisibility.VeryHidden, "wrong"), "stale confirmation rejected");
+            service.ActivateWorksheet(handle, service.GetWorksheetId(second));
+            Check(second.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden, "click never reveals VeryHidden");
+            service.ChangeVisibility(target, WorksheetVisibility.VeryHidden, second.Name);
+            Check(second.Visible == Excel.XlSheetVisibility.xlSheetVisible, "confirmed VeryHidden reveal");
+            var secondWindow = book.NewWindow();
+            var windowTarget = service.CaptureTarget(secondWindow.Hwnd, service.GetWorksheetId(second));
+            other = excel.Workbooks.Add();
+            var otherSheet = (Excel.Worksheet)other.Worksheets[1];
+            otherSheet.Name = second.Name;
+            service.SetTabColor(windowTarget, 255);
+            service.ChangeVisibility(windowTarget, WorksheetVisibility.Visible);
+            Check(service.GetTabColor(second) == 255 && service.GetTabColor(otherSheet) == null, "color stays in captured workbook across window switch");
+            Check(second.Visible == Excel.XlSheetVisibility.xlSheetHidden && otherSheet.Visible == Excel.XlSheetVisibility.xlSheetVisible, "visibility stays in captured workbook");
+            service.ChangeVisibility(windowTarget, WorksheetVisibility.Hidden);
+            secondWindow.Activate();
+            book.Protect(Structure: true);
+            Reject(() => service.SetTabColor(target, 255), "protected color rejected after capture");
+            Reject(() => service.ChangeVisibility(target, WorksheetVisibility.Visible), "protected visibility rejected after capture");
+            book.Unprotect();
+            for (int i = 1; i <= book.Worksheets.Count; i++)
+            {
+                var sheet = (Excel.Worksheet)book.Worksheets[i];
+                if (!Equals(sheet, first)) sheet.Visible = Excel.XlSheetVisibility.xlSheetHidden;
+            }
+            var firstTarget = service.CaptureTarget(handle, service.GetWorksheetId(first));
+            Reject(() => service.ChangeVisibility(firstTarget, WorksheetVisibility.Visible), "last visible cannot hide");
+            var chart = (Excel.Chart)book.Charts.Add();
+            service.ChangeVisibility(firstTarget, WorksheetVisibility.Visible);
+            Check(first.Visible == Excel.XlSheetVisibility.xlSheetHidden && chart.Visible == Excel.XlSheetVisibility.xlSheetVisible, "visible chart counts");
+            Check(!excel.DisplayAlerts, "appearance preserves alerts");
+            book.SaveAs(file, Excel.XlFileFormat.xlOpenXMLWorkbook);
+            book.Close(false);
+            book = null;
+            Reject(() => service.SetTabColor(windowTarget, 0), "closed captured window rejects color");
+            readOnly = excel.Workbooks.Open(file, ReadOnly: true);
+            Reject(() => service.CaptureTarget(readOnly.Windows[1].Hwnd, service.GetWorksheetId((Excel.Worksheet)readOnly.Worksheets[1])), "read-only appearance target rejected");
+        }
+        finally
+        {
+            if (book != null) book.Close(false);
+            if (readOnly != null) readOnly.Close(false);
+            if (other != null) other.Close(false);
+            excel.Quit();
+            if (System.IO.File.Exists(file)) System.IO.File.Delete(file);
+        }
+    }
+}
