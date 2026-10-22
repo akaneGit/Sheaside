@@ -213,6 +213,10 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Services\ExcelWorksheetService.cs" />
+    <Compile Include="Services\WorksheetNameRules.cs" />
+    <Compile Include="Controls\RenameSheetDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Services\SheetPaneManager.cs" />
     <Compile Include="SheasideRibbon.cs" />
     <EmbeddedResource Include="SheasideRibbon.xml" />
