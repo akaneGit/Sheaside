@@ -26,6 +26,7 @@ internal static partial class SmokeTests
             TestAppearance();
             TestChartList();
             TestMultiSelection();
+            TestPointerRegression();
             if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); TestExcelSelection(); }
             Console.WriteLine("PASS: " + assertions + " assertions" + (args.Contains("--excel") ? " (including Excel integration)" : " (managed only)"));
             return 0;

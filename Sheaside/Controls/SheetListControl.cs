@@ -202,7 +202,10 @@ namespace Sheaside.Controls
         private void OnSheetClicked(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left && sheetList.IndexFromPoint(e.Location) != ListBox.NoMatches)
+            {
+                selection.PreserveSelection = false;
                 RequestWorksheet();
+            }
         }
 
         private void OnSheetKeyDown(object sender, KeyEventArgs e)

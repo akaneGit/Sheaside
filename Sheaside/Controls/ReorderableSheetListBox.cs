@@ -22,6 +22,10 @@ namespace Sheaside.Controls
         private string activeWorksheetId;
         private bool blockDragGesture;
         private bool dispatchingPointer;
+        private bool pointerTracking;
+        private int pointerIndex = -1;
+        private int pointerClicks;
+        private bool collapseOnClick;
         public Keys PointerModifiers { get; private set; }
         public bool IsSelecting { get; private set; }
 
@@ -128,15 +132,14 @@ namespace Sheaside.Controls
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            if (pointerTracking && blockDragGesture && OutsideDragThreshold(e.Location)) consumedClick = true;
             if (e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging || SelectedItems.Count > 1) return;
-            Size threshold = SystemInformation.DragSize;
-            var deadZone = new Rectangle(mouseDownPoint.X - threshold.Width / 2,
-                mouseDownPoint.Y - threshold.Height / 2, threshold.Width, threshold.Height);
-            if (deadZone.Contains(e.Location)) return;
+            if (!OutsideDragThreshold(e.Location)) return;
             sourceIndex = Items.IndexOf(mouseDownItem);
             if (sourceIndex < 0) { mouseDownItem = null; return; }
 
             consumedClick = true;
+            IsSelecting = false; // DragCompleted must be able to reload the real order.
             IsDragging = true;
             cancelled = false;
             try
@@ -161,6 +164,78 @@ namespace Sheaside.Controls
                 mouseDownItem = null;
                 IsDragging = false;
                 DragCompleted?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private bool OutsideDragThreshold(Point point)
+        {
+            Size size = SystemInformation.DragSize;
+            return !new Rectangle(mouseDownPoint.X - size.Width / 2, mouseDownPoint.Y - size.Height / 2,
+                size.Width, size.Height).Contains(point);
+        }
+
+        private void BeginPointer(Point point, Keys modifiers, int clicks)
+        {
+            // Do not pass left-down to the native ListBox: it starts its own
+            // range-drag tracking and can replace Ctrl+Shift's existing set.
+            int[] previous = SelectedIndices.Cast<int>().ToArray();
+            int anchor = AnchorIndex;
+            pointerIndex = IndexFromPoint(point);
+            PointerModifiers = modifiers;
+            blockDragGesture = previous.Length > 1 || (modifiers & (Keys.Control | Keys.Shift)) != 0;
+            pointerClicks = clicks;
+            collapseOnClick = false;
+            Focus();
+            Capture = true;
+            pointerTracking = true;
+            IsSelecting = true;
+            bool control = (modifiers & Keys.Control) != 0;
+            bool shift = (modifiers & Keys.Shift) != 0;
+            if (pointerIndex >= 0)
+            {
+                if (anchor < 0 || anchor >= Items.Count) anchor = pointerIndex;
+                if (control && shift) // Union first; never take the Shift-only branch.
+                    SetPointerSelection(previous.Concat(Enumerable.Range(Math.Min(anchor, pointerIndex), Math.Abs(anchor - pointerIndex) + 1)).ToArray(), anchor);
+                else if (shift)
+                    SetPointerSelection(Enumerable.Range(Math.Min(anchor, pointerIndex), Math.Abs(anchor - pointerIndex) + 1).ToArray(), anchor);
+                else if (control)
+                    SetPointerSelection(previous.Contains(pointerIndex) ? previous.Where(i => i != pointerIndex).ToArray()
+                        : previous.Concat(new[] { pointerIndex }).ToArray(), pointerIndex);
+                else if (previous.Length > 1 && previous.Contains(pointerIndex))
+                    collapseOnClick = true; // Keep the set if this becomes a drag.
+                else SetPointerSelection(new[] { pointerIndex }, pointerIndex);
+                SendMessage(Handle, 0x019E, new IntPtr(pointerIndex), IntPtr.Zero); // caret, no scroll
+            }
+            dispatchingPointer = true;
+            try { OnMouseDown(new MouseEventArgs(MouseButtons.Left, clicks, point.X, point.Y, 0)); }
+            finally { dispatchingPointer = false; }
+            mouseDownPoint = point;
+        }
+
+        private void SetPointerSelection(int[] indices, int anchor)
+        {
+            int top = TopIndex;
+            var selected = new System.Collections.Generic.HashSet<int>(indices);
+            for (int i = 0; i < Items.Count; i++)
+                if (GetSelected(i) != selected.Contains(i)) SetSelected(i, selected.Contains(i));
+            AnchorIndex = anchor;
+            if (Items.Count > 0) TopIndex = top;
+        }
+
+        private void EndPointer(Point point)
+        {
+            if (OutsideDragThreshold(point)) consumedClick = true;
+            bool click = !consumedClick && pointerIndex >= 0 && IndexFromPoint(point) == pointerIndex;
+            if (click && collapseOnClick) SetPointerSelection(new[] { pointerIndex }, pointerIndex);
+            pointerTracking = false;
+            IsSelecting = false;
+            Capture = false;
+            OnMouseUp(new MouseEventArgs(MouseButtons.Left, pointerClicks, point.X, point.Y, 0));
+            if (click)
+            {
+                var args = new MouseEventArgs(MouseButtons.Left, pointerClicks, point.X, point.Y, 0);
+                if (pointerClicks == 2) OnMouseDoubleClick(args);
+                else OnMouseClick(args);
             }
         }
 
@@ -265,7 +340,13 @@ namespace Sheaside.Controls
 
         protected override void WndProc(ref Message m)
         {
-            if (m.Msg == 0x0202 || m.Msg == 0x0215) IsSelecting = false;
+            if (m.Msg == 0x0215 || m.Msg == 0x001F)
+            {
+                if (pointerTracking) { consumedClick = true; mouseDownItem = null; }
+                pointerTracking = false;
+                IsSelecting = false;
+                if (m.Msg == 0x001F) Capture = false;
+            }
             if (m.Msg == 0x0204) // Native right-down must not discard a multi-selection.
             {
                 Focus();
@@ -275,12 +356,18 @@ namespace Sheaside.Controls
             }
             if (m.Msg == 0x0201 || m.Msg == 0x0203)
             {
-                IsSelecting = true;
-                PointerModifiers = ModifierKeys;
-                blockDragGesture = SelectedItems.Count > 1 || (PointerModifiers & (Keys.Control | Keys.Shift)) != 0;
-                dispatchingPointer = true;
-                try { base.WndProc(ref m); }
-                finally { dispatchingPointer = false; }
+                int packed = m.LParam.ToInt32();
+                int flags = m.WParam.ToInt32();
+                Keys modifiers = ((flags & 8) != 0 ? Keys.Control : Keys.None) | ((flags & 4) != 0 ? Keys.Shift : Keys.None);
+                BeginPointer(new Point((short)packed, (short)(packed >> 16)), modifiers, m.Msg == 0x0203 ? 2 : 1);
+                return;
+            }
+            if (pointerTracking && (m.Msg == 0x0200 || m.Msg == 0x0202))
+            {
+                int packed = m.LParam.ToInt32();
+                var point = new Point((short)packed, (short)(packed >> 16));
+                if (m.Msg == 0x0202) EndPointer(point);
+                else OnMouseMove(new MouseEventArgs(MouseButtons.Left, 0, point.X, point.Y, 0));
                 return;
             }
             base.WndProc(ref m);

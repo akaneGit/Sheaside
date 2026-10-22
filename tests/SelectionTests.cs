@@ -33,9 +33,6 @@ internal static partial class SmokeTests
             int flags = (right ? 2 : 1) | ((modifiers & Keys.Control) != 0 ? 8 : 0) | ((modifiers & Keys.Shift) != 0 ? 4 : 0);
             SendMessage(list.Handle, right ? 0x0204 : 0x0201, new IntPtr(flags), point);
             SendMessage(list.Handle, right ? 0x0205 : 0x0202, IntPtr.Zero, point);
-            // The hidden test control is not under the real cursor, so WinForms
-            // does not synthesize MouseClick. Exercise that managed routing separately.
-            if (!right) InvokeControl(list, "OnMouseClick", new MouseEventArgs(MouseButtons.Left, 1, 8, row.Top + row.Height / 2, 0));
             list.ContextMenuStrip.Close();
         }
         finally { SetKeyboardState(previous); }
@@ -116,6 +113,78 @@ internal static partial class SmokeTests
             Check(invalidations == 0 && list.TopIndex == top, "unchanged refresh does not repaint or scroll");
             InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Escape));
             Check(list.TopIndex == top && view.SelectedSheetIds.SequenceEqual(new[] { "m0" }), "Escape preserves scroll even when active row is offscreen");
+        }
+    }
+
+    private static void TestPointerRegression()
+    {
+        using (var view = new SheetListControl { Size = new Size(320, 600) })
+        {
+            var rows = Enumerable.Range(0, 10).Select(i => new WorksheetItem("p" + i, "Row " + i, true)).ToArray();
+            view.ShowWorksheets("Book", rows, "p0");
+            var list = view.Controls.OfType<ReorderableSheetListBox>().Single();
+            list.CreateControl();
+            int starts = 0, activations = 0;
+            view.DragStarting += (s, e) => starts++; // Cancel=true prevents a blocking OLE loop.
+            view.WorksheetRequested += (s, e) => activations++;
+            Pointer(list, 0);
+            Pointer(list, 8, Keys.Control);
+            Pointer(list, 6, Keys.Control | Keys.Shift);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p0", "p6", "p7", "p8" }), "Ctrl Shift preserves disjoint existing selection");
+            Pointer(list, 9, Keys.Control | Keys.Shift);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p0", "p6", "p7", "p8", "p9" }) && list.AnchorIndex == 8, "successive Ctrl Shift unions retain anchor");
+            Pointer(list, 7, Keys.Shift);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p7", "p8" }), "Shift replaces previous union");
+            Pointer(list, 5, Keys.Shift);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p5", "p6", "p7", "p8" }) && list.AnchorIndex == 8, "successive Shift extends from original anchor");
+            Pointer(list, 8, Keys.Control);
+            Pointer(list, 9, Keys.Control | Keys.Shift);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p5", "p6", "p7", "p8", "p9" }), "Ctrl toggled off anchor remains range origin");
+            Check(activations == 1, "range gestures never activate Excel");
+
+            Action<int, int, int> drag = (from, to, flags) =>
+            {
+                Func<int, IntPtr> point = index => new IntPtr(((list.GetItemRectangle(index).Top + list.ItemHeight / 2) << 16) | 8);
+                SendMessage(list.Handle, 0x0201, new IntPtr(1 | flags), point(from));
+                // Deliberately release modifiers in subsequent messages. The down
+                // snapshot must decide reorder eligibility for this entire gesture.
+                SendMessage(list.Handle, 0x0200, new IntPtr(1), point(to));
+                SendMessage(list.Handle, 0x0200, new IntPtr(1), point(Math.Min(9, to + 1)));
+                SendMessage(list.Handle, 0x0202, IntPtr.Zero, point(to));
+            };
+            string[] before = view.SelectedSheetIds;
+            int activeBefore = activations;
+            drag(6, 2, 0);
+            Check(view.SelectedSheetIds.SequenceEqual(before) && starts == 0, "multi selected-row drag keeps exact set and never reorders");
+            Check(activations == activeBefore, "blocked selected-row drag does not activate");
+            drag(1, 4, 0);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p1" }) && starts == 0, "multi unselected-row drag stays single without native range selection");
+            Check(activations == activeBefore && !list.IsSelecting && !list.Capture, "blocked drag release clears tracking without activation");
+            drag(1, 4, 0);
+            Check(starts == 1, "next drag starting single retains reorder");
+            Pointer(list, 2);
+            drag(3, 6, 8);
+            Check(starts == 1 && view.SelectedSheetIds.SequenceEqual(new[] { "p2", "p3" }), "Ctrl drag only applies down toggle");
+            Pointer(list, 2);
+            drag(4, 7, 4);
+            Check(starts == 1 && view.SelectedSheetIds.SequenceEqual(new[] { "p2", "p3", "p4" }), "Shift drag freezes down range");
+            drag(6, 8, 12);
+            Check(starts == 1 && view.SelectedSheetIds.SequenceEqual(new[] { "p2", "p3", "p4", "p5", "p6" }), "Ctrl Shift drag freezes down union");
+            Pointer(list, 3);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p3" }), "plain release on selected row still collapses to one");
+            Pointer(list, 5, Keys.Control);
+            var down = new IntPtr(((list.GetItemRectangle(3).Top + list.ItemHeight / 2) << 16) | 8);
+            SendMessage(list.Handle, 0x0201, new IntPtr(1), down);
+            SendMessage(list.Handle, 0x001F, IntPtr.Zero, IntPtr.Zero);
+            SendMessage(list.Handle, 0x0202, IntPtr.Zero, down);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "p3", "p5" }) && !list.IsSelecting && !list.Capture, "cancel mode does not collapse selection");
+            Pointer(list, 1);
+            int renames = 0;
+            view.CommandRequested += (s, e) => { if (e.Command == WorksheetCommand.Rename) renames++; };
+            var doublePoint = new IntPtr(((list.GetItemRectangle(1).Top + list.ItemHeight / 2) << 16) | 8);
+            SendMessage(list.Handle, 0x0203, new IntPtr(1), doublePoint);
+            SendMessage(list.Handle, 0x0202, IntPtr.Zero, doublePoint);
+            Check(renames == 1, "native double-click messages still request rename");
         }
     }
 
