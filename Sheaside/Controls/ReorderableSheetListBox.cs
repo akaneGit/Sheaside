@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Sheaside.Models;
 using Sheaside.Services;
@@ -19,10 +20,24 @@ namespace Sheaside.Controls
         private bool cancelled;
         private bool consumedClick;
         private string activeWorksheetId;
+        private bool blockDragGesture;
+        private bool dispatchingPointer;
+        public Keys PointerModifiers { get; private set; }
+        public bool IsSelecting { get; private set; }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
+
+        public int AnchorIndex
+        {
+            get { return IsHandleCreated ? SendMessage(Handle, 0x019D, IntPtr.Zero, IntPtr.Zero).ToInt32() : SelectedIndex; }
+            set { if (value >= 0 && value < Items.Count) SendMessage(Handle, 0x019C, new IntPtr(value), IntPtr.Zero); }
+        }
 
         public ReorderableSheetListBox()
         {
             AllowDrop = true;
+            SelectionMode = SelectionMode.MultiExtended;
             DrawMode = DrawMode.OwnerDrawFixed;
             ItemHeight = Font.Height + 10;
             scrollTimer = new Timer { Interval = 120 };
@@ -87,7 +102,21 @@ namespace Sheaside.Controls
         {
             consumedClick = false;
             mouseDownItem = null;
-            if (e.Button == MouseButtons.Left && e.Clicks == 1)
+            if (!dispatchingPointer)
+            {
+                PointerModifiers = ModifierKeys;
+                blockDragGesture = SelectedItems.Count > 1 || (PointerModifiers & (Keys.Control | Keys.Shift)) != 0;
+            }
+            if (e.Button == MouseButtons.Right)
+            {
+                int hit = IndexFromPoint(e.Location);
+                if (hit < 0 || !GetSelected(hit))
+                {
+                    ClearSelected();
+                    if (hit >= 0) { SetSelected(hit, true); AnchorIndex = hit; }
+                }
+            }
+            if (e.Button == MouseButtons.Left && e.Clicks == 1 && !blockDragGesture)
             {
                 int index = IndexFromPoint(e.Location);
                 if (index != NoMatches) mouseDownItem = Items[index] as WorksheetItem;
@@ -99,7 +128,7 @@ namespace Sheaside.Controls
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            if (e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging) return;
+            if (e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging || SelectedItems.Count > 1) return;
             Size threshold = SystemInformation.DragSize;
             var deadZone = new Rectangle(mouseDownPoint.X - threshold.Width / 2,
                 mouseDownPoint.Y - threshold.Height / 2, threshold.Width, threshold.Height);
@@ -143,12 +172,12 @@ namespace Sheaside.Controls
 
         protected override void OnMouseClick(MouseEventArgs e)
         {
-            if (!consumedClick) base.OnMouseClick(e);
+            if (!consumedClick && (PointerModifiers & (Keys.Control | Keys.Shift)) == 0) base.OnMouseClick(e);
         }
 
         protected override void OnMouseDoubleClick(MouseEventArgs e)
         {
-            if (!consumedClick) base.OnMouseDoubleClick(e);
+            if (!consumedClick && SelectedItems.Count == 1 && (PointerModifiers & (Keys.Control | Keys.Shift)) == 0) base.OnMouseDoubleClick(e);
         }
 
         protected override void OnQueryContinueDrag(QueryContinueDragEventArgs e)
@@ -236,6 +265,24 @@ namespace Sheaside.Controls
 
         protected override void WndProc(ref Message m)
         {
+            if (m.Msg == 0x0202 || m.Msg == 0x0215) IsSelecting = false;
+            if (m.Msg == 0x0204) // Native right-down must not discard a multi-selection.
+            {
+                Focus();
+                int packed = m.LParam.ToInt32();
+                OnMouseDown(new MouseEventArgs(MouseButtons.Right, 1, (short)packed, (short)(packed >> 16), 0));
+                return;
+            }
+            if (m.Msg == 0x0201 || m.Msg == 0x0203)
+            {
+                IsSelecting = true;
+                PointerModifiers = ModifierKeys;
+                blockDragGesture = SelectedItems.Count > 1 || (PointerModifiers & (Keys.Control | Keys.Shift)) != 0;
+                dispatchingPointer = true;
+                try { base.WndProc(ref m); }
+                finally { dispatchingPointer = false; }
+                return;
+            }
             base.WndProc(ref m);
             // ListBox is a native control: paint the marker after its WM_PAINT,
             // including when the insertion point is in the empty client area.

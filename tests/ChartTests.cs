@@ -115,6 +115,14 @@ internal static partial class SmokeTests
             Check(service.GetTabColor(chart) == 255 && service.GetTabColor(otherChart) == null, "chart command stays in captured workbook");
             window.Activate();
             chart.Activate();
+            // Excel 2013's hidden automation can reject deleting a chart active
+            // in another window. Stabilize both windows; active-chart deletion is
+            // already covered by the copy/delete check above in a single window.
+            for (int i = 1; i <= book.Windows.Count; i++)
+            {
+                book.Windows[i].Activate();
+                data.Activate();
+            }
             service.DeleteWorksheet(target, chart.Name);
             Check(book.Charts.Count == 0 && service.GetWorksheets(book).All(i => i.Kind == SheetKind.Worksheet), "chart disappears after deletion");
             Reject(() => service.SetTabColor(target, 0), "stale deleted chart rejected");

@@ -25,7 +25,8 @@ internal static partial class SmokeTests
             TestDragControl();
             TestAppearance();
             TestChartList();
-            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); }
+            TestMultiSelection();
+            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); TestExcelSelection(); }
             Console.WriteLine("PASS: " + assertions + " assertions" + (args.Contains("--excel") ? " (including Excel integration)" : " (managed only)"));
             return 0;
         }
@@ -64,6 +65,7 @@ internal static partial class SmokeTests
             var rows = new List<WorksheetItem> { first, second };
             view.ShowWorksheets("Book", rows, "Sheet1");
             Check(list.SelectedIndex == 0, "initial active selection");
+            list.ClearSelected();
             list.SelectedIndex = 1;
             view.ShowWorksheets("Book", rows, "Sheet1");
             Check(list.SelectedIndex == 1, "preserve local navigation on timer tick");

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using Sheaside.Models;
 
@@ -11,10 +12,11 @@ namespace Sheaside.Controls
         private readonly Label workbookLabel;
         private readonly ReorderableSheetListBox sheetList;
         private readonly Label statusLabel;
+        private readonly Label selectionLabel;
+        private readonly Button addButton;
+        private readonly SheetSelectionState selection = new SheetSelectionState();
         private readonly ContextMenuStrip sheetMenu;
         private WorksheetItem menuTarget;
-        private string lastActiveId;
-        private bool hasSnapshot;
         private bool updating;
 
         public SheetListControl()
@@ -24,6 +26,7 @@ namespace Sheaside.Controls
             Padding = new Padding(8);
             workbookLabel = new Label { Dock = DockStyle.Top, Height = 32, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
             statusLabel = new Label { Dock = DockStyle.Bottom, Height = 64, AutoEllipsis = true };
+            selectionLabel = new Label { Dock = DockStyle.Bottom, Height = 26, AutoEllipsis = true };
             sheetList = new ReorderableSheetListBox
             {
                 Dock = DockStyle.Fill,
@@ -38,7 +41,7 @@ namespace Sheaside.Controls
             sheetList.MouseDoubleClick += (sender, args) =>
             {
                 int index = sheetList.IndexFromPoint(args.Location);
-                if (args.Button == MouseButtons.Left && index != ListBox.NoMatches)
+                if (args.Button == MouseButtons.Left && index != ListBox.NoMatches && sheetList.SelectedItems.Count == 1)
                     RequestCommand(WorksheetCommand.Rename, (WorksheetItem)sheetList.Items[index]);
             };
             sheetMenu = new ContextMenuStrip();
@@ -56,20 +59,25 @@ namespace Sheaside.Controls
             sheetMenu.Opening += (sender, args) =>
             {
                 menuTarget = sheetList.SelectedItem as WorksheetItem;
-                for (int i = 1; i < sheetMenu.Items.Count; i++) sheetMenu.Items[i].Enabled = menuTarget != null;
-                hide.Enabled = menuTarget?.Visibility == WorksheetVisibility.Visible;
-                unhide.Enabled = menuTarget?.Visibility == WorksheetVisibility.Hidden;
-                reveal.Enabled = menuTarget?.Visibility == WorksheetVisibility.VeryHidden;
+                bool single = sheetList.SelectedItems.Count == 1;
+                sheetMenu.Items[0].Enabled = sheetList.SelectedItems.Count <= 1;
+                for (int i = 1; i < sheetMenu.Items.Count; i++) sheetMenu.Items[i].Enabled = single;
+                hide.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.Visible;
+                unhide.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.Hidden;
+                reveal.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.VeryHidden;
             };
             sheetList.MouseDown += (sender, args) =>
             {
-                if (args.Button == MouseButtons.Right)
-                    sheetList.SelectedIndex = sheetList.IndexFromPoint(args.Location);
+                if (args.Button == MouseButtons.Left)
+                    selection.PreserveSelection = (sheetList.PointerModifiers & (Keys.Control | Keys.Shift)) != 0;
+                CaptureSelection();
             };
             sheetList.ContextMenuStrip = sheetMenu;
-            var addButton = new Button { Text = "+ シートを追加", Dock = DockStyle.Top, Height = 32, AccessibleName = "シートを追加" };
+            addButton = new Button { Text = "+ シートを追加", Dock = DockStyle.Top, Height = 32, AccessibleName = "シートを追加" };
             addButton.Click += (sender, args) => RequestCommand(WorksheetCommand.Add, sheetList.SelectedItem as WorksheetItem);
+            sheetList.SelectedIndexChanged += (sender, args) => { if (!updating) CaptureSelection(); };
             Controls.Add(sheetList);
+            Controls.Add(selectionLabel);
             Controls.Add(statusLabel);
             Controls.Add(addButton);
             Controls.Add(workbookLabel);
@@ -95,30 +103,59 @@ namespace Sheaside.Controls
             remove { sheetList.DragCompleted -= value; }
         }
         public void CancelDrag() { sheetList.CancelDrag(); }
+        public string[] SelectedSheetIds
+        {
+            get
+            {
+                var ids = new HashSet<string>(selection.SelectedIds);
+                return sheetList.Items.Cast<WorksheetItem>().Where(item => ids.Contains(item.Id)).Select(item => item.Id).ToArray();
+            }
+        }
+
+        private void CaptureSelection()
+        {
+            if (updating) return;
+            selection.Capture(sheetList.SelectedItems.Cast<WorksheetItem>().Select(item => item.Id));
+            int anchor = sheetList.AnchorIndex;
+            if (anchor >= 0 && anchor < sheetList.Items.Count) selection.AnchorId = ((WorksheetItem)sheetList.Items[anchor]).Id;
+            UpdateSelectionSummary();
+        }
+
+        private void UpdateSelectionSummary()
+        {
+            int count = sheetList.SelectedItems.Count;
+            selectionLabel.Text = count + "件選択中" + (count > 1 ? "（操作は1件選択時）" : "");
+            addButton.Enabled = count <= 1;
+        }
+
+        private void ApplySelection()
+        {
+            var ids = new HashSet<string>(selection.SelectedIds);
+            int anchor = -1;
+            for (int i = 0; i < sheetList.Items.Count; i++)
+            {
+                var item = (WorksheetItem)sheetList.Items[i];
+                bool wanted = ids.Contains(item.Id);
+                if (sheetList.GetSelected(i) != wanted) sheetList.SetSelected(i, wanted);
+                if (item.Id == selection.AnchorId) anchor = i;
+            }
+            sheetList.AnchorIndex = anchor;
+            UpdateSelectionSummary();
+        }
 
         public void ShowWorksheets(string workbookName, IList<WorksheetItem> worksheets, string activeId, string preferredId = null)
         {
-            if (IsDragging) return;
+            if (IsDragging || sheetList.IsSelecting) return;
             workbookLabel.Text = workbookName;
-            var previousSelection = sheetList.SelectedItem as WorksheetItem;
-            string selection = preferredId ?? (!hasSnapshot || lastActiveId != activeId
-                ? activeId : previousSelection?.Id);
-            int selectedIndex = -1;
-            for (int i = 0; i < worksheets.Count; i++)
-                if (worksheets[i].Id == selection) selectedIndex = i;
-            if (selectedIndex < 0)
-                for (int i = 0; i < worksheets.Count; i++)
-                    if (worksheets[i].Id == activeId) selectedIndex = i;
+            CaptureSelection();
+            selection.Reconcile(worksheets.Select(item => item.Id), activeId, preferredId);
 
             bool changed = sheetList.Items.Count != worksheets.Count;
             for (int i = 0; !changed && i < worksheets.Count; i++)
                 changed = !SameItem((WorksheetItem)sheetList.Items[i], worksheets[i]);
-            lastActiveId = activeId;
             sheetList.SetActiveWorksheet(activeId);
-            hasSnapshot = true;
-            if (!changed && sheetList.SelectedIndex == selectedIndex) return;
             updating = true;
-            sheetList.BeginUpdate();
+            if (changed) sheetList.BeginUpdate();
             try
             {
                 int topIndex = sheetList.TopIndex;
@@ -128,17 +165,17 @@ namespace Sheaside.Controls
                     else if (!SameItem((WorksheetItem)sheetList.Items[i], worksheets[i])) sheetList.Items[i] = worksheets[i];
                 }
                 while (sheetList.Items.Count > worksheets.Count) sheetList.Items.RemoveAt(sheetList.Items.Count - 1);
-                sheetList.UpdateTextExtent();
+                if (changed) sheetList.UpdateTextExtent();
 
-                sheetList.SelectedIndex = selectedIndex;
-                if (changed && sheetList.Items.Count > 0)
+                ApplySelection();
+                if (sheetList.Items.Count > 0)
                     sheetList.TopIndex = Math.Min(Math.Max(0, topIndex), sheetList.Items.Count - 1);
                 if (changed || statusLabel.Text.Length == 0)
                     statusLabel.Text = worksheets.Count == 0 ? "シートがありません。" : "クリック、または選択して Enter で切り替えます。";
             }
             finally
             {
-                sheetList.EndUpdate();
+                if (changed) sheetList.EndUpdate();
                 updating = false;
             }
         }
@@ -152,7 +189,7 @@ namespace Sheaside.Controls
 
         private void RequestCommand(WorksheetCommand command, WorksheetItem worksheet)
         {
-            if (!updating && !IsDragging && (command == WorksheetCommand.Add || worksheet != null))
+            if (!updating && !IsDragging && sheetList.SelectedItems.Count <= 1 && (command == WorksheetCommand.Add || worksheet != null))
                 CommandRequested?.Invoke(this, new WorksheetCommandEventArgs(command, worksheet));
         }
 
@@ -170,6 +207,24 @@ namespace Sheaside.Controls
 
         private void OnSheetKeyDown(object sender, KeyEventArgs e)
         {
+            if ((e.Control && e.KeyCode == Keys.A) || e.KeyCode == Keys.Escape)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                if (IsDragging) { CancelDrag(); return; }
+                if (e.KeyCode == Keys.Escape) selection.ResetToActive();
+                else
+                {
+                    selection.Capture(sheetList.Items.Cast<WorksheetItem>().Select(item => item.Id));
+                    selection.PreserveSelection = true;
+                }
+                int top = sheetList.TopIndex;
+                updating = true;
+                try { ApplySelection(); if (sheetList.Items.Count > 0) sheetList.TopIndex = top; }
+                finally { updating = false; }
+                return;
+            }
+            if (e.Control || e.Shift) selection.PreserveSelection = true;
             if (e.KeyCode != Keys.Enter) return;
             e.Handled = true;
             e.SuppressKeyPress = true;
@@ -179,7 +234,7 @@ namespace Sheaside.Controls
         private void RequestWorksheet()
         {
             var worksheet = sheetList.SelectedItem as WorksheetItem;
-            if (!updating && !IsDragging && worksheet != null)
+            if (!updating && !IsDragging && sheetList.SelectedItems.Count == 1 && worksheet != null)
                 WorksheetRequested?.Invoke(this, new WorksheetRequestedEventArgs(worksheet));
         }
     }

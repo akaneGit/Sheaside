@@ -18,6 +18,7 @@ internal static partial class SmokeTests
             var list = view.Controls.OfType<ListBox>().Single();
             var rows = Enumerable.Range(0, 40).Select(i => new WorksheetItem("s" + i, "Sheet " + i, true)).ToArray();
             view.ShowWorksheets("Book", rows, "s0");
+            list.ClearSelected();
             list.SelectedIndex = 20;
             list.TopIndex = 18;
             int top = list.TopIndex;

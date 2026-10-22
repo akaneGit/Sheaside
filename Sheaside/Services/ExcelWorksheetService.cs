@@ -26,11 +26,21 @@ namespace Sheaside.Services
             public int SourceIndex;
         }
         private readonly Excel.Application application;
+        // Keep identities stable even before Excel initializes CodeName. References
+        // live only as long as the open workbook; deleted rows are pruned on refresh.
+        private readonly Dictionary<Excel.Workbook, Dictionary<object, string>> identities =
+            new Dictionary<Excel.Workbook, Dictionary<object, string>>();
+
+        public void ClearIdentities() { identities.Clear(); }
 
         public ExcelWorksheetService(Excel.Application application) { this.application = application; }
 
         public IList<Excel.Window> GetWindows()
         {
+            var openBooks = new HashSet<Excel.Workbook>();
+            var books = application.Workbooks;
+            for (int i = 1; i <= books.Count; i++) openBooks.Add(books[i]);
+            foreach (var book in identities.Keys.Where(book => !openBooks.Contains(book)).ToArray()) identities.Remove(book);
             var result = new List<Excel.Window>();
             var windows = application.Windows;
             for (int i = 1; i <= windows.Count; i++)
@@ -62,12 +72,17 @@ namespace Sheaside.Services
         public IList<WorksheetItem> GetWorksheets(Excel.Workbook workbook)
         {
             var result = new List<WorksheetItem>();
+            var liveSheets = new HashSet<object>();
             var worksheets = workbook.Sheets;
             for (int i = 1; i <= worksheets.Count; i++)
             {
                 var sheet = ExcelSheet.From(worksheets[i]);
+                liveSheets.Add(sheet.Native);
                 result.Add(new WorksheetItem(GetWorksheetId(sheet), sheet.Name, (WorksheetVisibility)(int)sheet.Visible, GetTabColor(sheet), sheet.Kind));
             }
+            Dictionary<object, string> registry;
+            if (identities.TryGetValue(workbook, out registry))
+                foreach (object sheet in registry.Keys.Where(sheet => !liveSheets.Contains(sheet)).ToArray()) registry.Remove(sheet);
             return result;
         }
 
@@ -79,12 +94,15 @@ namespace Sheaside.Services
 
         public string GetWorksheetId(object nativeSheet)
         {
-            // Fresh workbooks can have empty CodeNames until Excel initializes VBA.
-            // Names are unique within a workbook, including chart sheets. Prefixes
-            // prevent collisions between a real CodeName and the fallback name.
             var sheet = nativeSheet as ExcelSheet ?? ExcelSheet.From(nativeSheet);
-            string codeName = sheet.CodeName;
-            return (sheet.Kind == SheetKind.Chart ? "chart:" : "") + (string.IsNullOrEmpty(codeName) ? "name:" + sheet.Name : "code:" + codeName);
+            var workbook = (Excel.Workbook)sheet.Parent;
+            Dictionary<object, string> registry;
+            if (!identities.TryGetValue(workbook, out registry))
+                identities.Add(workbook, registry = new Dictionary<object, string>());
+            string id;
+            if (!registry.TryGetValue(sheet.Native, out id))
+                registry.Add(sheet.Native, id = (sheet.Kind == SheetKind.Chart ? "chart:" : "sheet:") + Guid.NewGuid().ToString("N"));
+            return id;
         }
 
         public string ActivateWorksheet(int windowHandle, string codeName)
@@ -365,6 +383,7 @@ namespace Sheaside.Services
 
         // Do not FinalReleaseComObject on Excel/VSTO's shared RCWs. In particular,
         // releasing an event argument or Application can disconnect other add-ins.
-        // No workbook/worksheet RCW is stored in the view or a long-lived field.
+        // The view stores IDs only. The identity registry retains RCWs while their
+        // workbook is open, pruning deleted sheets and clearing on shutdown.
     }
 }

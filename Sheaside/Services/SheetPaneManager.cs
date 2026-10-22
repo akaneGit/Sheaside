@@ -429,6 +429,7 @@ namespace Sheaside.Services
                 DetachDragHandlers(entry);
             }
             entries.Clear();
+            worksheets.ClearIdentities();
             // VSTO owns task pane/control disposal at shutdown. Remove must not be
             // called here: the collection may already have been disposed by VSTO.
         }

@@ -209,6 +209,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
     <Compile Include="Models\WorksheetItem.cs" />
+    <Compile Include="Models\SheetSelectionState.cs" />
     <Compile Include="Models\WorksheetDragEventArgs.cs" />
     <Compile Include="Controls\ReorderableSheetListBox.cs" />
     <Compile Include="Services\WorksheetMoveRules.cs" />
