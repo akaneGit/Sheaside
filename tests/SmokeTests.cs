@@ -9,7 +9,7 @@ using Sheaside.Models;
 using Sheaside.Services;
 using Excel = Microsoft.Office.Interop.Excel;
 
-internal static class SmokeTests
+internal static partial class SmokeTests
 {
     private static int assertions;
 
@@ -21,7 +21,9 @@ internal static class SmokeTests
             TestNames();
             TestList();
             TestRenameDialog();
-            if (args.Contains("--excel")) TestExcel();
+            TestReorderRules();
+            TestDragControl();
+            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); }
             Console.WriteLine("PASS: " + assertions + " assertions" + (args.Contains("--excel") ? " (including Excel integration)" : " (managed only)"));
             return 0;
         }

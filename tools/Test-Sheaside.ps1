@@ -12,7 +12,11 @@ $interop = Join-Path $repoRoot 'Sheaside/obj/Debug/Interop.Microsoft.Office.Inte
 if (-not (Test-Path -LiteralPath $interop)) { throw 'Build the Debug configuration first.' }
 $sources = @(
     'tests/SmokeTests.cs',
+    'tests/ReorderTests.cs',
     'Sheaside/Models/WorksheetItem.cs',
+    'Sheaside/Models/WorksheetDragEventArgs.cs',
+    'Sheaside/Controls/ReorderableSheetListBox.cs',
+    'Sheaside/Services/WorksheetMoveRules.cs',
     'Sheaside/Controls/SheetListControl.cs',
     'Sheaside/Controls/RenameSheetDialog.cs',
     'Sheaside/Services/WorksheetNameRules.cs',

@@ -21,6 +21,9 @@ namespace Sheaside.Services
             public EventHandler<WorksheetRequestedEventArgs> WorksheetHandler;
             public EventHandler<WorksheetCommandEventArgs> CommandHandler;
             public string PreferredSelection;
+            public EventHandler<WorksheetDragStartingEventArgs> DragStartingHandler;
+            public EventHandler<WorksheetDropEventArgs> DropHandler;
+            public EventHandler DragCompletedHandler;
         }
 
         private readonly Excel.Application application;
@@ -32,6 +35,10 @@ namespace Sheaside.Services
         private bool disposed;
         private bool operating;
         private int? activeHandle;
+        private PaneEntry draggingEntry;
+        private ExcelWorksheetService.MoveSession moveSession;
+        private bool dragCancelled;
+        private string dragStatus;
 
         public SheetPaneManager(Excel.Application application, CustomTaskPaneCollection taskPanes)
         {
@@ -51,6 +58,7 @@ namespace Sheaside.Services
             application.WindowActivate += OnWindowActivate;
             application.WorkbookActivate += OnWorkbookActivate;
             application.SheetActivate += OnSheetActivate;
+            application.WindowDeactivate += OnWindowDeactivate;
             refreshTimer.Start();
             Refresh();
         }
@@ -78,13 +86,34 @@ namespace Sheaside.Services
         }
 
         private void OnRefresh(object sender, EventArgs e) { Refresh(); }
-        private void OnWindowActivate(Excel.Workbook workbook, Excel.Window window) { Refresh(); }
-        private void OnWorkbookActivate(Excel.Workbook workbook) { Refresh(); }
+        private void OnWindowActivate(Excel.Workbook workbook, Excel.Window window)
+        {
+            if (!operating) CancelCurrentDrag("ウィンドウが切り替わったため、並び替えを中止しました。");
+            Refresh();
+        }
+        private void OnWindowDeactivate(Excel.Workbook workbook, Excel.Window window)
+        {
+            if (!operating) CancelCurrentDrag("ウィンドウが切り替わったため、並び替えを中止しました。");
+        }
+        private void OnWorkbookActivate(Excel.Workbook workbook)
+        {
+            if (!operating) CancelCurrentDrag("ブックが切り替わったため、並び替えを中止しました。");
+            Refresh();
+        }
         private void OnSheetActivate(object sheet) { Refresh(); }
 
         private void Refresh()
         {
             if (disposed || refreshing || operating) return;
+            if (draggingEntry != null)
+            {
+                if (!dragCancelled)
+                {
+                    try { worksheets.ValidateMove(moveSession); }
+                    catch (Exception exception) when (IsOperationError(exception)) { CancelCurrentDrag(OperationErrorMessage(exception)); }
+                }
+                return; // Never dispose/rebind a native control inside its OLE drag loop.
+            }
             refreshing = true;
             try
             {
@@ -141,6 +170,12 @@ namespace Sheaside.Services
                 view.WorksheetRequested += entry.WorksheetHandler;
                 entry.CommandHandler = (sender, args) => ExecuteCommand(handle, entry, args);
                 view.CommandRequested += entry.CommandHandler;
+                entry.DragStartingHandler = (sender, args) => StartDrag(handle, entry, args);
+                entry.DropHandler = (sender, args) => DropSheet(entry, args);
+                entry.DragCompletedHandler = (sender, args) => FinishDrag(entry);
+                view.DragStarting += entry.DragStartingHandler;
+                view.DropRequested += entry.DropHandler;
+                view.DragCompleted += entry.DragCompletedHandler;
                 pane.VisibleChanged += OnVisibleChanged;
                 entries.Add(handle, entry);
                 StateChanged?.Invoke(this, EventArgs.Empty);
@@ -156,7 +191,7 @@ namespace Sheaside.Services
 
         private void ActivateWorksheet(int handle, PaneEntry entry, WorksheetItem worksheet)
         {
-            if (disposed || operating) return;
+            if (disposed || operating || draggingEntry != null) return;
             try { entry.View.ShowStatus(worksheets.ActivateWorksheet(handle, worksheet.Id)); }
             catch (COMException exception)
             {
@@ -168,7 +203,7 @@ namespace Sheaside.Services
 
         private void ExecuteCommand(int handle, PaneEntry entry, WorksheetCommandEventArgs args)
         {
-            if (disposed || operating) return;
+            if (disposed || operating || draggingEntry != null) return;
             operating = true;
             string status = null;
             try
@@ -224,6 +259,64 @@ namespace Sheaside.Services
             }
         }
 
+        private void StartDrag(int handle, PaneEntry entry, WorksheetDragStartingEventArgs args)
+        {
+            if (disposed || operating || draggingEntry != null) return;
+            try
+            {
+                moveSession = worksheets.CaptureMove(handle, args.WorksheetId, args.Order);
+                draggingEntry = entry;
+                dragCancelled = false;
+                dragStatus = null;
+                entry.PreferredSelection = args.WorksheetId;
+                args.Cancel = false;
+            }
+            catch (Exception exception) when (IsOperationError(exception))
+            {
+                moveSession = null;
+                entry.View.ShowStatus(OperationErrorMessage(exception));
+            }
+        }
+
+        private void CancelCurrentDrag(string message)
+        {
+            if (draggingEntry == null || dragCancelled) return;
+            dragCancelled = true;
+            dragStatus = message;
+            draggingEntry.View.CancelDrag();
+        }
+
+        private void DropSheet(PaneEntry entry, WorksheetDropEventArgs args)
+        {
+            if (disposed || operating || draggingEntry != entry || dragCancelled || moveSession == null) return;
+            operating = true;
+            try
+            {
+                bool moved = worksheets.MoveWorksheet(moveSession, args.Boundary);
+                entry.PreferredSelection = worksheets.GetWorksheetId(moveSession.Target.Worksheet);
+                dragStatus = moved ? "シートを並び替えました。" : null;
+            }
+            catch (Exception exception) when (IsOperationError(exception))
+            {
+                dragStatus = OperationErrorMessage(exception);
+            }
+            finally { operating = false; }
+            // FinishDrag reloads Excel's real order after DoDragDrop returns,
+            // including when Move failed or an Excel event changed the workbook.
+        }
+
+        private void FinishDrag(PaneEntry entry)
+        {
+            if (draggingEntry != null && draggingEntry != entry) return;
+            string status = dragStatus;
+            draggingEntry = null;
+            moveSession = null; // Release our short-lived COM references, not shared RCWs.
+            dragStatus = null;
+            dragCancelled = false;
+            Refresh();
+            if (!entry.View.IsDisposed && status != null) entry.View.ShowStatus(status);
+        }
+
         private static bool IsOperationError(Exception exception)
         {
             return exception is COMException || exception is InvalidOperationException || exception is InvalidComObjectException;
@@ -238,6 +331,7 @@ namespace Sheaside.Services
 
         private void OnVisibleChanged(object sender, EventArgs e)
         {
+            if (!operating) CancelCurrentDrag("パネルの表示状態が変わったため、並び替えを中止しました。");
             StateChanged?.Invoke(this, EventArgs.Empty);
             Refresh();
         }
@@ -254,6 +348,7 @@ namespace Sheaside.Services
             }
             entry.View.WorksheetRequested -= entry.WorksheetHandler;
             entry.View.CommandRequested -= entry.CommandHandler;
+            DetachDragHandlers(entry);
             entry.View.Dispose();
             entries.Remove(handle);
             StateChanged?.Invoke(this, EventArgs.Empty);
@@ -263,21 +358,32 @@ namespace Sheaside.Services
         {
             if (disposed) return;
             disposed = true;
+            CancelCurrentDrag("並び替えを中止しました。");
+            moveSession = null;
             refreshTimer.Stop();
             refreshTimer.Tick -= OnRefresh;
             refreshTimer.Dispose();
             application.WindowActivate -= OnWindowActivate;
             application.WorkbookActivate -= OnWorkbookActivate;
             application.SheetActivate -= OnSheetActivate;
+            application.WindowDeactivate -= OnWindowDeactivate;
             foreach (var entry in entries.Values)
             {
                 entry.Pane.VisibleChanged -= OnVisibleChanged;
                 entry.View.WorksheetRequested -= entry.WorksheetHandler;
                 entry.View.CommandRequested -= entry.CommandHandler;
+                DetachDragHandlers(entry);
             }
             entries.Clear();
             // VSTO owns task pane/control disposal at shutdown. Remove must not be
             // called here: the collection may already have been disposed by VSTO.
+        }
+
+        private static void DetachDragHandlers(PaneEntry entry)
+        {
+            entry.View.DragStarting -= entry.DragStartingHandler;
+            entry.View.DropRequested -= entry.DropHandler;
+            entry.View.DragCompleted -= entry.DragCompletedHandler;
         }
     }
 }

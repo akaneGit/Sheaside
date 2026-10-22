@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Sheaside.Models;
 using Excel = Microsoft.Office.Interop.Excel;
 
@@ -14,6 +15,15 @@ namespace Sheaside.Services
             public Excel.Workbook Workbook;
             public Excel.Worksheet Worksheet;
             public int WindowHandle;
+        }
+
+        internal sealed class MoveSession
+        {
+            public OperationTarget Target;
+            public object[] SheetOrder;
+            public Excel.Worksheet[] Worksheets;
+            public string[] WorksheetIds;
+            public int SourceIndex;
         }
         private readonly Excel.Application application;
 
@@ -207,6 +217,93 @@ namespace Sheaside.Services
                 target.Worksheet.Delete();
             }
             finally { application.DisplayAlerts = previousAlerts; }
+        }
+
+        public MoveSession CaptureMove(int windowHandle, string worksheetId, IList<string> displayedOrder)
+        {
+            var target = CaptureTarget(windowHandle, worksheetId);
+            if (target.Worksheet == null) throw new InvalidOperationException("移動するシートを選択してください。");
+            var allSheets = target.Workbook.Sheets;
+            var order = new object[allSheets.Count];
+            for (int i = 0; i < order.Length; i++) order[i] = allSheets[i + 1];
+            var worksheetObjects = order.OfType<Excel.Worksheet>().ToArray();
+            var ids = worksheetObjects.Select(GetWorksheetId).ToArray();
+            if (!ids.SequenceEqual(displayedOrder))
+                throw new InvalidOperationException("シート一覧が変更されました。更新後にもう一度ドラッグしてください。");
+            var session = new MoveSession
+            {
+                Target = target, SheetOrder = order, Worksheets = worksheetObjects, WorksheetIds = ids,
+                SourceIndex = Array.IndexOf(ids, worksheetId)
+            };
+            ValidateMove(session);
+            return session;
+        }
+
+        public void ValidateMove(MoveSession session)
+        {
+            ValidateTarget(session.Target);
+            var activeWindow = application.ActiveWindow;
+            if (activeWindow == null || activeWindow.Hwnd != session.Target.WindowHandle ||
+                !Equals(GetWorkbook(activeWindow), session.Target.Workbook))
+                throw new InvalidOperationException("ブックまたはウィンドウが切り替わったため、並び替えを中止しました。");
+            var sheets = session.Target.Workbook.Sheets;
+            if (sheets.Count != session.SheetOrder.Length)
+                throw new InvalidOperationException("ドラッグ中にシート構成が変更されました。もう一度操作してください。");
+            for (int i = 0; i < sheets.Count; i++)
+                if (!Equals(sheets[i + 1], session.SheetOrder[i]))
+                    throw new InvalidOperationException("ドラッグ中にシート順が変更されました。もう一度操作してください。");
+            if (!session.Worksheets.Select(GetWorksheetId).SequenceEqual(session.WorksheetIds))
+                throw new InvalidOperationException("ドラッグ中にシートの識別情報が変わりました。もう一度操作してください。");
+        }
+
+        public bool MoveWorksheet(MoveSession session, int boundary)
+        {
+            ValidateMove(session);
+            int destination = WorksheetMoveRules.DestinationIndex(session.SourceIndex, boundary, session.Worksheets.Length);
+            if (destination == session.SourceIndex) return false;
+            var source = session.Target.Worksheet;
+            var anchor = boundary < session.Worksheets.Length ? session.Worksheets[boundary] : session.Worksheets.Last();
+            if (!Equals(source.Parent, session.Target.Workbook) || !Equals(anchor.Parent, session.Target.Workbook))
+                throw new InvalidOperationException("異なるブックへの移動はできません。");
+            // Exactly one argument is mandatory; neither would create a NEW workbook.
+            // Chart sheets are not anchors. Preserve their order relative to each other.
+            var visibility = source.Visible;
+            bool hidden = visibility != Excel.XlSheetVisibility.xlSheetVisible;
+            bool screenUpdating = application.ScreenUpdating;
+            object previouslyActiveSheet = hidden ? session.Target.Window.ActiveSheet : null;
+            try
+            {
+                // Excel can reject moving a VeryHidden sheet directly. Do not expose
+                // its contents: suspend painting and restore visibility in all cases.
+                if (hidden)
+                {
+                    application.ScreenUpdating = false;
+                    source.Visible = Excel.XlSheetVisibility.xlSheetVisible;
+                    ValidateMove(session);
+                }
+                if (boundary < session.Worksheets.Length) source.Move(Before: anchor);
+                else source.Move(After: anchor);
+            }
+            finally
+            {
+                if (hidden)
+                {
+                    try
+                    {
+                        source.Visible = visibility;
+                        var currentWindow = application.ActiveWindow;
+                        if (currentWindow != null && currentWindow.Hwnd == session.Target.WindowHandle)
+                        {
+                            var previousWorksheet = previouslyActiveSheet as Excel.Worksheet;
+                            var previousChart = previouslyActiveSheet as Excel.Chart;
+                            if (previousWorksheet != null) previousWorksheet.Activate();
+                            else if (previousChart != null) previousChart.Activate();
+                        }
+                    }
+                    finally { application.ScreenUpdating = screenUpdating; }
+                }
+            }
+            return true;
         }
 
         // Do not FinalReleaseComObject on Excel/VSTO's shared RCWs. In particular,

@@ -9,7 +9,7 @@ namespace Sheaside.Controls
     internal sealed class SheetListControl : UserControl
     {
         private readonly Label workbookLabel;
-        private readonly ListBox sheetList;
+        private readonly ReorderableSheetListBox sheetList;
         private readonly Label statusLabel;
         private readonly ContextMenuStrip sheetMenu;
         private WorksheetItem menuTarget;
@@ -24,7 +24,7 @@ namespace Sheaside.Controls
             Padding = new Padding(8);
             workbookLabel = new Label { Dock = DockStyle.Top, Height = 32, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
             statusLabel = new Label { Dock = DockStyle.Bottom, Height = 64, AutoEllipsis = true };
-            sheetList = new ListBox
+            sheetList = new ReorderableSheetListBox
             {
                 Dock = DockStyle.Fill,
                 IntegralHeight = false,
@@ -68,9 +68,27 @@ namespace Sheaside.Controls
         public event EventHandler<WorksheetRequestedEventArgs> WorksheetRequested;
         public event EventHandler<WorksheetCommandEventArgs> CommandRequested;
         public bool IsMenuOpen { get { return sheetMenu.Visible; } }
+        public bool IsDragging { get { return sheetList.IsDragging; } }
+        public event EventHandler<WorksheetDragStartingEventArgs> DragStarting
+        {
+            add { sheetList.DragStarting += value; }
+            remove { sheetList.DragStarting -= value; }
+        }
+        public event EventHandler<WorksheetDropEventArgs> DropRequested
+        {
+            add { sheetList.DropRequested += value; }
+            remove { sheetList.DropRequested -= value; }
+        }
+        public event EventHandler DragCompleted
+        {
+            add { sheetList.DragCompleted += value; }
+            remove { sheetList.DragCompleted -= value; }
+        }
+        public void CancelDrag() { sheetList.CancelDrag(); }
 
         public void ShowWorksheets(string workbookName, IList<WorksheetItem> worksheets, string activeId, string preferredId = null)
         {
+            if (IsDragging) return;
             workbookLabel.Text = workbookName;
             var previousSelection = sheetList.SelectedItem as WorksheetItem;
             string selection = preferredId ?? (!hasSnapshot || lastActiveId != activeId
@@ -122,7 +140,7 @@ namespace Sheaside.Controls
 
         private void RequestCommand(WorksheetCommand command, WorksheetItem worksheet)
         {
-            if (!updating && (command == WorksheetCommand.Add || worksheet != null))
+            if (!updating && !IsDragging && (command == WorksheetCommand.Add || worksheet != null))
                 CommandRequested?.Invoke(this, new WorksheetCommandEventArgs(command, worksheet));
         }
 
@@ -149,7 +167,7 @@ namespace Sheaside.Controls
         private void RequestWorksheet()
         {
             var worksheet = sheetList.SelectedItem as WorksheetItem;
-            if (!updating && worksheet != null)
+            if (!updating && !IsDragging && worksheet != null)
                 WorksheetRequested?.Invoke(this, new WorksheetRequestedEventArgs(worksheet));
         }
     }
