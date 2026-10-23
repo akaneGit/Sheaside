@@ -103,15 +103,15 @@ namespace Sheaside.Controls
                 CaptureSelection();
             };
             sheetList.ContextMenuStrip = sheetMenu;
-            addButton = new Button { Text = "＋ 追加", Dock = DockStyle.Fill, AccessibleName = "シートを追加" };
+            addButton = new ModernButton { Icon = LineIcon.Add, Text = "追加", Dock = DockStyle.Fill, AccessibleName = "シートを追加" };
             addButton.Click += (sender, args) => RequestCommand(WorksheetCommand.Add, sheetList.SelectedItem as WorksheetItem);
-            deleteButton = new Button { Text = "削除", Dock = DockStyle.Fill, AccessibleName = "選択シートを削除", Enabled = false };
+            deleteButton = new ModernButton { Icon = LineIcon.Delete, Text = "削除", Dock = DockStyle.Fill, AccessibleName = "選択シートを削除", Enabled = false };
             deleteButton.Click += (s, e) =>
             {
                 batchMenuTargets = SelectedSheetIds;
                 RequestBatch(SheetBatchCommand.Delete);
             };
-            var actions = new TableLayoutPanel { Dock = DockStyle.Top, Height = 34, ColumnCount = 2, RowCount = 1 };
+            var actions = new TableLayoutPanel { Dock = DockStyle.Top, Height = 40, ColumnCount = 2, RowCount = 1 };
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             actions.Controls.Add(addButton, 0, 0); actions.Controls.Add(deleteButton, 1, 0);
@@ -120,7 +120,7 @@ namespace Sheaside.Controls
             Controls.Add(selectionLabel);
             Controls.Add(actions);
             var header = new Panel { Dock = DockStyle.Top, Height = 32 };
-            var settingsButton = new Button { Text = "設定", Dock = DockStyle.Right, Width = 54, AccessibleName = "Sheasideの設定" };
+            var settingsButton = new ModernButton { Icon = LineIcon.Settings, Text = "設定", Dock = DockStyle.Right, Width = 76, AccessibleName = "Sheasideの設定" };
             header.Controls.Add(workbookLabel); header.Controls.Add(settingsButton);
             settingsButton.Click += (s, e) =>
             {
@@ -133,19 +133,16 @@ namespace Sheaside.Controls
                 }
             };
             preferences.Changed += OnPreferencesChanged;
-            var filters = new Panel { Dock = DockStyle.Top, Height = 58 };
-            var searchRow = new Panel { Dock = DockStyle.Top, Height = 28 };
+            var filters = new Panel { Dock = DockStyle.Top, Height = 68 };
+            var searchRow = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(0, 4, 0, 4) };
             searchBox = new TextBox { Dock = DockStyle.Fill, AccessibleName = "シート名を部分一致検索" };
-            filterButton = new Button { Dock = DockStyle.Right, Width = 30, AccessibleName = "状態と種類のフィルター" };
-            filterButton.Paint += (s, e) =>
-            {
-                using (var pen = new Pen(HasFacetFilter ? Color.ForestGreen : filterButton.ForeColor, 2))
-                    e.Graphics.DrawPolygon(pen, new[] { new Point(7, 7), new Point(22, 7), new Point(17, 13), new Point(17, 21), new Point(12, 18), new Point(12, 13) });
-            };
+            filterButton = new ModernButton { Icon = LineIcon.Filter, Dock = DockStyle.Right, Width = 34, AccessibleName = "状態と種類のフィルター" };
             filterButton.Click += (s, e) => ToggleFilterPopup();
-            searchRow.Controls.Add(searchBox); searchRow.Controls.Add(filterButton);
+            var searchIcon = new Panel { Dock = DockStyle.Left, Width = 26, AccessibleName = "検索" };
+            searchIcon.Paint += (s, e) => { int size = (int)Math.Round(16 * e.Graphics.DpiX / 96F); ModernButton.DrawIcon(e.Graphics, LineIcon.Search, new Rectangle(2, (searchIcon.Height - size) / 2, size, size), searchIcon.ForeColor); };
+            searchRow.Controls.Add(searchBox); searchRow.Controls.Add(searchIcon); searchRow.Controls.Add(filterButton);
             filterSummary = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
-            var clear = ClearFilterButton = new Button { Text = "解除", Dock = DockStyle.Right, Width = 48, Visible = false, AccessibleName = "状態・種類フィルターを解除" };
+            var clear = ClearFilterButton = new ModernButton { Text = "解除", Dock = DockStyle.Right, Width = 48, Visible = false, AccessibleName = "状態・種類フィルターを解除" };
             clear.Click += (s, e) => SetFilter(searchBox.Text, null, null);
             var summaryRow = new Panel { Dock = DockStyle.Fill };
             summaryRow.Controls.Add(filterSummary); summaryRow.Controls.Add(clear);
@@ -180,13 +177,13 @@ namespace Sheaside.Controls
         {
             if (filterPopup.Visible) { filterPopup.Visible = false; return; }
             foreach (Control child in filterPopup.Controls.Cast<Control>().ToArray()) child.Dispose();
-            var contents = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var contents = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(6) };
             contents.Controls.Add(new Label { Text = "状態", AutoSize = true });
             string[] states = { "すべて", "表示", "非表示", "VeryHidden" };
             for (int i = 0; i < (preferences.ShowVeryHidden ? 4 : 3); i++)
             {
                 int value = i;
-                var button = new Button { Text = (visibilityFilter == i ? "✓ " : "　") + states[i], Width = 170, Height = 26 };
+                var button = new ModernButton { Selected = visibilityFilter == i, Text = (visibilityFilter == i ? "✓ " : "") + states[i], Width = 164, Height = 28 };
                 button.Click += (s, e) => { visibilityFilter = value; filterPopup.Visible = false; RefreshFilter(); };
                 contents.Controls.Add(button);
             }
@@ -195,7 +192,7 @@ namespace Sheaside.Controls
             for (int i = 0; i < 3; i++)
             {
                 int value = i;
-                var button = new Button { Text = (kindFilter == i ? "✓ " : "　") + kinds[i], Width = 170, Height = 26 };
+                var button = new ModernButton { Selected = kindFilter == i, Text = (kindFilter == i ? "✓ " : "") + kinds[i], Width = 164, Height = 28 };
                 button.Click += (s, e) => { kindFilter = value; filterPopup.Visible = false; RefreshFilter(); };
                 contents.Controls.Add(button);
             }
@@ -231,7 +228,8 @@ namespace Sheaside.Controls
         {
             if (changingFilter) return;
             ClearFilterButton.Visible = HasFacetFilter;
-            filterSummary.Text = (visibilityFilter == 0 ? "状態:すべて" : new[] { "", "表示", "非表示", "VeryHidden" }[visibilityFilter]) + " / " + (kindFilter == 0 ? "種類:すべて" : kindFilter == 1 ? "ワークシート" : "グラフシート");
+            filterSummary.Text = !HasFacetFilter ? "" : (visibilityFilter == 0 ? "状態:すべて" : new[] { "", "表示", "非表示", "VeryHidden" }[visibilityFilter]) + " / " + (kindFilter == 0 ? "種類:すべて" : kindFilter == 1 ? "ワークシート" : "グラフシート");
+            ((ModernButton)filterButton).Selected = HasFacetFilter;
             filterButton.Invalidate();
             CancelDrag();
             sheetMenu.Close(); batchMenuTargets = new string[0];

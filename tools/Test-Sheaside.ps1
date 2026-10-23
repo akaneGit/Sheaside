@@ -23,6 +23,7 @@ $sources = @(
     'Sheaside/Models/SheetBatch.cs',
     'Sheaside/Models/TabColorChoice.cs',
     'Sheaside/Controls/ColorPaletteDialog.cs',
+    'Sheaside/Controls/ModernButton.cs',
     'Sheaside/Services/SheetBatchRunner.cs',
     'Sheaside/Services/UserPreferences.cs',
     'Sheaside/Services/OfficeThemeReader.cs',

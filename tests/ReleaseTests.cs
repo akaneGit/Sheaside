@@ -52,6 +52,21 @@ internal static partial class SmokeTests
 
     private static void TestThemes()
     {
+        using (var button = new ModernButton { Text = "追加", Icon = LineIcon.Add, Size = new System.Drawing.Size(120, 34), BackColor = System.Drawing.Color.White, ForeColor = System.Drawing.Color.Black })
+        {
+            InvokeControl(button, "OnMouseEnter", EventArgs.Empty);
+            Check(button.IsHovered, "modern button hover state");
+            InvokeControl(button, "OnMouseLeave", EventArgs.Empty);
+            Check(!button.IsHovered && button.GetPreferredSize(System.Drawing.Size.Empty).Height >= 32, "modern button spacing and hover reset");
+            foreach (int dpi in new[] { 96, 120, 144 })
+                using (var bitmap = new System.Drawing.Bitmap(180, 60))
+                {
+                    bitmap.SetResolution(dpi, dpi);
+                    using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                        foreach (LineIcon icon in Enum.GetValues(typeof(LineIcon))) ModernButton.DrawIcon(graphics, icon, new System.Drawing.Rectangle(5, 5, dpi / 6, dpi / 6), System.Drawing.Color.Black);
+                    Check(bitmap.GetPixel(5 + dpi / 12, 5 + dpi / 12).A > 0, "line icons render at DPI " + dpi);
+                }
+        }
         Check(OfficeThemeReader.Decode(16, 0) == OfficeTheme.Colorful && OfficeThemeReader.Decode(16, 5) == OfficeTheme.White, "Office light theme mapping");
         Check(OfficeThemeReader.Decode(16, 3) == OfficeTheme.DarkGray && OfficeThemeReader.Decode(16, 4) == OfficeTheme.Black, "Office dark theme mapping");
         Check(OfficeThemeReader.Decode(15, 2) == OfficeTheme.DarkGray && OfficeThemeReader.Decode(15, 1) == OfficeTheme.LightGray, "Office 2013 theme mapping");
@@ -77,6 +92,17 @@ internal static partial class SmokeTests
             Check(list.Width > 150 && list.Height > 80, "compact pane keeps usable list area");
             first.Size = new System.Drawing.Size(500, 700); first.PerformLayout();
             Check(list.Width > 400 && list.Height > 300, "list expands with pane size");
+            Check(first.AddButton is ModernButton && first.DeleteButton is ModernButton && first.AddButton.Height == first.DeleteButton.Height, "action buttons use unified renderer and equal height");
+            first.Size = new System.Drawing.Size(300, 520);
+            first.ShowWorksheets("UI preview", new[] { new WorksheetItem("a", "売上", true), new WorksheetItem("b", "集計", WorksheetVisibility.Hidden, 255), new WorksheetItem("c", "グラフ", WorksheetVisibility.Visible, null, SheetKind.Chart) }, "a");
+            first.SetFilter("", WorksheetVisibility.Visible, null);
+            first.ToggleFilterPopup(); first.PerformLayout();
+            Check(first.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<ModernButton>().Count(b => b.Selected) == 2, "popup clearly marks one state and one kind");
+            using (var bitmap = new System.Drawing.Bitmap(first.Width, first.Height))
+            {
+                first.DrawToBitmap(bitmap, first.ClientRectangle);
+                bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc3-pane.png"));
+            }
         }
     }
 

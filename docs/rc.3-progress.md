@@ -3,8 +3,10 @@
 基点e025ea3（rc.2）。既存のslnx Project Id、csproj SubType/CanonicalName差分は保護し、コミット対象外。
 
 1. フィルターUI: 実装済み。外側の解除のみ、適用時だけ表示。検索を保持。外クリック/再クリック/Esc/Excelウィンドウ切替/ペイン非表示で閉じる。管理341チェック、Debug/Release警告0・エラー0。Excel 2013連携込み495チェック成功。
-2. モダンUI: 未着手。
+2. モダンUI: 実装済み。自作16単位の線画アイコン、フラット/控えめ角丸ボタン、ホバー/選択/無効/フォーカス描画、余白・高さ統一。外部素材なし。管理348チェック、両ビルド警告0・エラー0。Excel 2013連携込み502チェック成功。Phase 1: 3674bb6。
 3. 設定画面: 未着手。
 4. 総合回帰・RC文書: 未着手。
 
 Microsoft 365へのインストール、GitHub Releases公開、MSI変更は今回行わない。
+
+デザイン参考: https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/icons （簡潔で意味が伝わる線画・ベクター描画を参考にし、素材を転載していない）。
