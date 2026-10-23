@@ -125,7 +125,7 @@ namespace Sheaside.Controls
                 using (var dialog = new PreferencesDialog(preferences))
                 {
                     if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                    try { preferences.SetOptions(dialog.ShowVeryHidden, dialog.Theme, dialog.StartupVisible, dialog.DockLeft); }
+                    try { preferences.SetOptions(dialog.ShowVeryHidden, dialog.StartupVisible); }
                     catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
                     { MessageBox.Show(this, "設定を保存できませんでした。\r\n" + ex.Message, "Sheaside"); }
                 }
@@ -227,14 +227,21 @@ namespace Sheaside.Controls
             filterPopup.Visible = false;
             RefreshFilter();
         }
+        private OfficeTheme officeTheme;
+        internal void SetOfficeTheme(OfficeTheme theme)
+        {
+            if (officeTheme == theme) return;
+            officeTheme = theme;
+            ApplyTheme();
+        }
         private void ApplyTheme()
         {
-            bool system = preferences.Theme == PaneTheme.System || SystemInformation.HighContrast;
-            bool dark = !system && preferences.Theme == PaneTheme.Dark;
-            Color background = system ? SystemColors.Control : dark ? Color.FromArgb(32, 32, 32) : Color.WhiteSmoke;
+            bool system = officeTheme == OfficeTheme.System || SystemInformation.HighContrast;
+            bool dark = !system && (officeTheme == OfficeTheme.Black || officeTheme == OfficeTheme.DarkGray);
+            Color background = system ? SystemColors.Control : officeTheme == OfficeTheme.DarkGray ? Color.FromArgb(68, 68, 68) : dark ? Color.FromArgb(32, 32, 32) : officeTheme == OfficeTheme.LightGray ? Color.Gainsboro : Color.WhiteSmoke;
             Color foreground = system ? SystemColors.ControlText : dark ? Color.WhiteSmoke : Color.FromArgb(24, 24, 24);
             ApplyColors(this, background, foreground);
-            sheetList.BackColor = system ? SystemColors.Window : dark ? Color.FromArgb(24, 24, 24) : Color.White;
+            sheetList.BackColor = system ? SystemColors.Window : officeTheme == OfficeTheme.DarkGray ? Color.FromArgb(58, 58, 58) : dark ? Color.FromArgb(24, 24, 24) : Color.White;
             sheetList.ForeColor = system ? SystemColors.WindowText : foreground;
             sheetMenu.BackColor = background; sheetMenu.ForeColor = foreground;
             sheetList.Invalidate();

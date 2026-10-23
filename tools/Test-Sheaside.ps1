@@ -25,6 +25,7 @@ $sources = @(
     'Sheaside/Controls/ColorPaletteDialog.cs',
     'Sheaside/Services/SheetBatchRunner.cs',
     'Sheaside/Services/UserPreferences.cs',
+    'Sheaside/Services/OfficeThemeReader.cs',
     'Sheaside/Services/ExcelSheetBatchService.cs',
     'Sheaside/Controls/BatchDetailsDialog.cs',
     'Sheaside/Controls/PreferencesDialog.cs',

@@ -163,6 +163,7 @@ namespace Sheaside.Services
                     var workbook = worksheets.GetWorkbook(window);
                     if (workbook != null)
                     {
+                        entry.View.SetOfficeTheme(OfficeThemeReader.Read(application.Version));
                         entry.View.ShowWorksheets(workbook.Name, worksheets.GetWorksheets(workbook), worksheets.GetActiveWorksheetId(window), entry.PreferredSelection);
                         entry.PreferredSelection = null;
                     }
@@ -192,7 +193,7 @@ namespace Sheaside.Services
             try
             {
                 pane = taskPanes.Add(view, "Sheaside", window);
-                pane.DockPosition = preferences.DockLeft ? Office.MsoCTPDockPosition.msoCTPDockPositionLeft : Office.MsoCTPDockPosition.msoCTPDockPositionRight;
+                pane.DockPosition = Office.MsoCTPDockPosition.msoCTPDockPositionRight;
                 pane.Width = 300;
                 pane.Visible = preferences.StartupVisible;
                 var entry = new PaneEntry { Pane = pane, View = view };
@@ -452,15 +453,7 @@ namespace Sheaside.Services
         {
             if (disposed) return;
             CancelCurrentDrag("設定が変更されたため、並び替えを中止しました。");
-            bool previous = operating; operating = true;
-            try
-            {
-                foreach (var entry in entries.Values)
-                    entry.Pane.DockPosition = preferences.DockLeft ? Office.MsoCTPDockPosition.msoCTPDockPositionLeft : Office.MsoCTPDockPosition.msoCTPDockPositionRight;
-            }
-            catch (Exception exception) when (IsOperationError(exception))
-            { MessageBox.Show(OperationErrorMessage(exception), "Sheaside — パネル位置"); }
-            finally { operating = previous; Refresh(); }
+            Refresh();
         }
 
         private void RemovePane(int handle)
