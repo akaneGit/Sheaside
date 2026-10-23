@@ -22,6 +22,14 @@ internal static partial class SmokeTests
         Reject(() => TabColorChoice.Themed(5, double.NaN, 0), "invalid tint rejected");
         using (var dialog = new ColorPaletteDialog(null))
             Check(dialog.Selection == null, "opening palette does not change color");
+        using (var dialog = new ColorPaletteDialog(TabColorChoice.DefaultTheme()))
+        {
+            var grid = dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<TableLayoutPanel>().Single();
+            Check(grid.Controls.Count == 60, "palette grid exposes all theme shades");
+            typeof(Button).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(grid.GetControlFromPosition(4, 2), new object[] { EventArgs.Empty });
+            Check(dialog.Selection.Theme == 5 && dialog.Selection.Tint == .6 && dialog.DialogResult == DialogResult.OK, "palette button selects linked theme tint");
+        }
         var settings = new UserPreferences(); settings.SetShowVeryHidden(true);
         using (var view = new SheetListControl(settings) { Size = new Size(260, 400) })
         {

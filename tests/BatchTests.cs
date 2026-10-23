@@ -118,6 +118,16 @@ internal static partial class SmokeTests
             Check(result.Count(SheetBatchStatus.Succeeded) == 3 && Convert.ToInt32(chart.Tab.ThemeColor) == 5 && Math.Abs(chart.Tab.TintAndShade - .4) < .0001, "worksheet and chart retain theme and tint");
             result = batches.Execute(capture(SheetBatchCommand.SetColor), false, choice: themeChoice);
             Check(result.Count(SheetBatchStatus.Skipped) == 3, "same theme tint skips");
+            int previousThemeColor = themeColors[4];
+            int? previousTabColor = service.GetTabColor(chart);
+            try
+            {
+                ((dynamic)book).Theme.ThemeColorScheme.Colors(5).RGB = 255;
+                Check(service.GetThemeColors(book)[4] == 255, "palette reacquires changed workbook theme");
+                Check(service.GetTabColor(chart) != previousTabColor && Convert.ToInt32(chart.Tab.ThemeColor) == 5, "chart tab follows workbook theme change without losing link");
+                Check(service.GetWorksheets(book).Single(i => i.Id == ids[0]).TabColor == service.GetTabColor(a), "snapshot reflects changed themed worksheet RGB");
+            }
+            finally { ((dynamic)book).Theme.ThemeColorScheme.Colors(5).RGB = previousThemeColor; }
             result = batches.Execute(capture(SheetBatchCommand.SetColor), false, choice: TabColorChoice.Fixed(service.GetTabColor(a)));
             Check(result.Count(SheetBatchStatus.Succeeded) == 3, "fixed RGB replaces theme link even when appearance matches");
             batches.Execute(capture(SheetBatchCommand.ClearColor), false);
