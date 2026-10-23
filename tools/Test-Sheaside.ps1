@@ -21,6 +21,8 @@ $sources = @(
     'Sheaside/Models/WorksheetItem.cs',
     'Sheaside/Models/SheetSelectionState.cs',
     'Sheaside/Models/SheetBatch.cs',
+    'Sheaside/Models/TabColorChoice.cs',
+    'Sheaside/Controls/ColorPaletteDialog.cs',
     'Sheaside/Services/SheetBatchRunner.cs',
     'Sheaside/Services/UserPreferences.cs',
     'Sheaside/Services/ExcelSheetBatchService.cs',

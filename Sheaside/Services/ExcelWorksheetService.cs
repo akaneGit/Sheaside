@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Sheaside.Models;
 using Excel = Microsoft.Office.Interop.Excel;
 
@@ -278,6 +279,39 @@ namespace Sheaside.Services
             if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
             if (color.HasValue) target.Sheet.Tab.Color = color.Value;
             else target.Sheet.Tab.ColorIndex = Excel.XlColorIndex.xlColorIndexNone;
+        }
+
+        public int[] GetThemeColors(Excel.Workbook workbook)
+        {
+            try
+            {
+                dynamic theme = ((dynamic)workbook).Theme;
+                var result = new int[10];
+                for (int i = 0; i < result.Length; i++) result[i] = Convert.ToInt32(theme.ThemeColorScheme.Colors(i + 1).RGB);
+                return result;
+            }
+            catch (Exception e) when (e is COMException || e is InvalidComObjectException || e is Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+            { return null; }
+        }
+        public bool MatchesTabColor(ExcelSheet sheet, TabColorChoice choice)
+        {
+            if (!choice.Theme.HasValue)
+            {
+                if (GetTabColor(sheet) != choice.Rgb) return false;
+                if (!choice.Rgb.HasValue) return true;
+                try { int theme = Convert.ToInt32(sheet.Tab.ThemeColor); return theme < 1 || theme > 12; }
+                catch (COMException) { return true; }
+            }
+            try { return Convert.ToInt32(sheet.Tab.ThemeColor) == choice.Theme.Value && Math.Abs(sheet.Tab.TintAndShade - choice.Tint) < .0001; }
+            catch (COMException) { return false; } // RGB tabs have no ThemeColor.
+        }
+        public void SetTabColorChoice(OperationTarget target, TabColorChoice choice)
+        {
+            ValidateTarget(target);
+            if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if (!choice.Theme.HasValue) { SetTabColor(target, choice.Rgb); return; }
+            target.Sheet.Tab.ThemeColor = (Excel.XlThemeColor)choice.Theme.Value;
+            target.Sheet.Tab.TintAndShade = choice.Tint;
         }
 
         public void ChangeVisibility(OperationTarget target, WorksheetVisibility expected, string confirmedName = null)

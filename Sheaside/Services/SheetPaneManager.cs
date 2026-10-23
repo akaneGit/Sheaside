@@ -327,13 +327,13 @@ namespace Sheaside.Services
                 var plan = batches.Capture(handle, args.Ids, args.Command);
                 string title = SheetListControl.BatchCommandName(args.Command);
                 int? color = null;
+                TabColorChoice choice = null;
                 if (args.Command == SheetBatchCommand.SetColor)
                 {
-                    using (var dialog = new ColorDialog { FullOpen = true })
+                    using (var dialog = new ColorPaletteDialog(worksheets.GetThemeColors(plan.Context.Workbook)))
                     {
-                        if (plan.Items[0].TabColor.HasValue) dialog.Color = System.Drawing.ColorTranslator.FromOle(plan.Items[0].TabColor.Value);
                         if (dialog.ShowDialog(entry.View) != DialogResult.OK) return;
-                        color = System.Drawing.ColorTranslator.ToOle(dialog.Color);
+                        choice = dialog.Selection;
                     }
                 }
                 bool confirmed = false;
@@ -347,7 +347,7 @@ namespace Sheaside.Services
                         confirmed = dialog.ShowDialog(entry.View) == DialogResult.OK;
                     if (!confirmed) return;
                 }
-                result = batches.Execute(plan, confirmed, color);
+                result = batches.Execute(plan, confirmed, color, choice);
                 if (plan.Items.Count == 1 && args.Command == SheetBatchCommand.Duplicate && result.Items[0].Status == SheetBatchStatus.Succeeded)
                     entry.PreferredSelection = result.Items[0].CreatedId;
             }

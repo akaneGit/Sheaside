@@ -64,7 +64,7 @@ namespace Sheaside.Services
             }
         }
 
-        public SheetBatchResult Execute(Plan plan, bool confirmed, int? color = null)
+        public SheetBatchResult Execute(Plan plan, bool confirmed, int? color = null, TabColorChoice choice = null)
         {
             if (executing) throw new InvalidOperationException("一括処理は既に実行中です。");
             executing = true;
@@ -73,7 +73,7 @@ namespace Sheaside.Services
                 return SheetBatchRunner.Run(plan.Items, () =>
                 {
                     if (plan.NeedsConfirmation && !confirmed) throw new InvalidOperationException("対象の確認が必要です。変更していません。");
-                    if (plan.Command == SheetBatchCommand.SetColor && !color.HasValue) throw new InvalidOperationException("色を選択してください。");
+                    if (plan.Command == SheetBatchCommand.SetColor && !color.HasValue && choice == null) throw new InvalidOperationException("色を選択してください。");
                     ValidateRemaining(plan, 0); // All selected IDs re-resolved AFTER every dialog, before any mutation.
                 }, (index, outcome) =>
                 {
@@ -103,6 +103,13 @@ namespace Sheaside.Services
                             break;
                         case SheetBatchCommand.SetColor:
                         case SheetBatchCommand.ClearColor:
+                            if (plan.Command == SheetBatchCommand.SetColor && choice != null)
+                            {
+                                skipped = sheets.MatchesTabColor(target.Sheet, choice);
+                                if (!skipped) sheets.SetTabColorChoice(target, choice);
+                                if (!sheets.MatchesTabColor(target.Sheet, choice)) throw new InvalidOperationException("テーマ色の変更を確認できませんでした。");
+                                break;
+                            }
                             int? desired = plan.Command == SheetBatchCommand.ClearColor ? null : color;
                             skipped = sheets.GetTabColor(target.Sheet) == desired;
                             if (!skipped) sheets.SetTabColor(target, desired);

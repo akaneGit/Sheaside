@@ -111,6 +111,16 @@ internal static partial class SmokeTests
             Check(result.Count(SheetBatchStatus.Succeeded) == 3 && service.GetTabColor(chart) == null, "batch clear color");
             result = batches.Execute(capture(SheetBatchCommand.ClearColor), false);
             Check(result.Count(SheetBatchStatus.Skipped) == 3, "batch clear already unset skips");
+            var themeColors = service.GetThemeColors(book);
+            Check(themeColors != null && themeColors.Length == 10, "workbook theme palette retrieved");
+            var themeChoice = TabColorChoice.Themed(5, .4, themeColors[4]);
+            result = batches.Execute(capture(SheetBatchCommand.SetColor), false, choice: themeChoice);
+            Check(result.Count(SheetBatchStatus.Succeeded) == 3 && Convert.ToInt32(chart.Tab.ThemeColor) == 5 && Math.Abs(chart.Tab.TintAndShade - .4) < .0001, "worksheet and chart retain theme and tint");
+            result = batches.Execute(capture(SheetBatchCommand.SetColor), false, choice: themeChoice);
+            Check(result.Count(SheetBatchStatus.Skipped) == 3, "same theme tint skips");
+            result = batches.Execute(capture(SheetBatchCommand.SetColor), false, choice: TabColorChoice.Fixed(service.GetTabColor(a)));
+            Check(result.Count(SheetBatchStatus.Succeeded) == 3, "fixed RGB replaces theme link even when appearance matches");
+            batches.Execute(capture(SheetBatchCommand.ClearColor), false);
             plan = capture(SheetBatchCommand.SetColor);
             b.Name = "Changed";
             result = batches.Execute(plan, false, 123);

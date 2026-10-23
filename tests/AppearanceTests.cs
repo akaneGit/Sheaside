@@ -13,6 +13,15 @@ internal static partial class SmokeTests
 {
     private static void TestAppearance()
     {
+        var palette = TabColorChoice.Palette(TabColorChoice.DefaultTheme(), true);
+        Check(palette.Count == 60 && palette.All(c => c.Theme.HasValue), "theme palette has sixty linked colors");
+        Check(palette[0].Theme == 2 && palette[1].Theme == 1 && palette[4].Theme == 5, "Excel palette theme order");
+        Check(palette[14].Tint == .8 && palette[54].Tint == -.5, "theme tint shades");
+        Check(TabColorChoice.Palette(null, true).All(c => !c.Theme.HasValue), "unavailable theme falls back to fixed RGB");
+        Reject(() => TabColorChoice.Themed(0, 0, 0), "invalid theme rejected");
+        Reject(() => TabColorChoice.Themed(5, double.NaN, 0), "invalid tint rejected");
+        using (var dialog = new ColorPaletteDialog(null))
+            Check(dialog.Selection == null, "opening palette does not change color");
         var settings = new UserPreferences(); settings.SetShowVeryHidden(true);
         using (var view = new SheetListControl(settings) { Size = new Size(260, 400) })
         {
