@@ -114,6 +114,11 @@ internal static partial class SmokeTests
             first.SetFilter("", WorksheetVisibility.Visible, null);
             first.ToggleFilterPopup(); first.PerformLayout();
             Check(first.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<ModernButton>().Count(b => b.Selected) == 2, "popup clearly marks one state and one kind");
+            using (var popupImage = new System.Drawing.Bitmap(first.FilterPopup.Width, first.FilterPopup.Height))
+            {
+                first.FilterPopup.DrawToBitmap(popupImage, first.FilterPopup.ClientRectangle);
+                popupImage.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc3-filter.png"));
+            }
             using (var bitmap = new System.Drawing.Bitmap(first.Width, first.Height))
             {
                 first.DrawToBitmap(bitmap, first.ClientRectangle);
@@ -177,6 +182,14 @@ internal static partial class SmokeTests
             var escape = Message.Create(IntPtr.Zero, 0x100, (IntPtr)Keys.Escape, IntPtr.Zero);
             typeof(SheetListControl).GetMethod("ProcessCmdKey", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(view, new object[] { escape, Keys.Escape });
             Check(!view.FilterPopup.Visible && view.HasFacetFilter, "escape closes popup and retains facets");
+            view.ToggleFilterPopup();
+            view.HandlePopupPointer(view.FilterPopup.PointToScreen(new System.Drawing.Point(10, 10)));
+            Check(view.FilterPopup.Visible, "pointer inside popup keeps it open");
+            InvokeControl(view, "OnLeave", EventArgs.Empty);
+            Check(!view.FilterPopup.Visible && view.HasFacetFilter, "focus moving to native Excel dismisses popup without resetting");
+            view.ToggleFilterPopup();
+            var deactivate = Message.Create(IntPtr.Zero, 0x1C, IntPtr.Zero, IntPtr.Zero);
+            Check(!view.PreFilterMessage(ref deactivate) && !view.FilterPopup.Visible, "application deactivate dismisses and never swallows native message");
             view.ClearFilterButton.PerformClick();
             Check(!view.ClearFilterButton.Visible, "reset hidden when facets cleared");
             Check(!view.HasFacetFilter && list.Items.Count == 2 && view.IsFiltered, "one-click facet reset keeps search");

@@ -1,6 +1,6 @@
 # Sheaside 1.0 Release Candidate
 
-Excelのシートを縦型一覧で管理するWindows向けVSTOアドインです。C# / .NET Framework 4.8 / Excel Interop / WinFormsを使用します。RC識別子は `1.0.0-rc.2`。Microsoft 365での実機確認後に正式版を確定します。
+Excelのシートを縦型一覧で管理するWindows向けVSTOアドインです。C# / .NET Framework 4.8 / Excel Interop / WinFormsを使用します。RC識別子は `1.0.0-rc.3`。Microsoft 365での実機確認後に正式版を確定します。
 
 ## 操作
 
@@ -17,7 +17,7 @@ Excelのシートを縦型一覧で管理するWindows向けVSTOアドインで�
 - ［設定］ではVeryHidden表示と新しいウィンドウでの初期表示を保存します。Officeテーマを可能な範囲で検出し、Windows高コントラストを優先します。パネル位置はExcel標準のドラッグ操作で変更します。
 - リボン［Sheaside］とパネルの×で、ウィンドウごとの表示を切り替えます。
 
-検索右のフィルターボタンで状態・種類を指定し、条件だけをワンクリック解除できます。検索文字は保持します。上部の追加・削除ボタンと右クリックメニューは同じ安全性チェックを使います。タブ色はテーマ色・濃淡・標準色・任意RGBから選択でき、テーマ指定はブックのテーマ変更に追従します。
+検索右のフィルターボタンで状態・種類を指定し、適用中だけ表示される外側の［解除］で条件を解除できます。ポップアップ内の解除は廃止しました。外クリック・Esc・ウィンドウ切替・ペイン非表示でポップアップが閉じます。検索文字は保持します。上部の追加・削除ボタンと右クリックメニューは同じ安全性チェックを使います。タブ色はテーマ色・濃淡・標準色・任意RGBから選択でき、テーマ指定はブックのテーマ変更に追従します。
 
 ## 安全性と同期
 
@@ -39,18 +39,19 @@ Visual Studio 2026 Community、Office/SharePoint開発ツール、.NET Framework
 .\tools\Test-Sheaside.ps1 -Excel
 # 切り分け用
 .\tools\Test-Sheaside.ps1 -Excel -BatchOnly
-# MSI・配布ZIP生成（インストール・外部公開なし）
-.\tools\Build-Msi.ps1
+# 専用Excelを一時表示してホスト内のフィルターUIを確認
+.\tools\Test-ExcelUi.ps1
+
 ```
 
-RC2の検証結果は[開発記録](docs/rc.2-progress.md)を参照してください。MSIは`artifacts/Sheaside-1.0.0-rc.2.msi`、配布ZIPは同フォルダーに生成します。
+RC3の検証結果は[開発記録](docs/rc.3-progress.md)を参照してください。今回の対象はExcel 2013上のUI改善です。MSIの再作成、Microsoft 365へのインストール、GitHub Releases公開は実施していません。既存のMSI関連スクリプト・成果物はRC2のままです。
 
-自動テストは専用ブック・独立したExcel 2013（15.0）インスタンスを使用します。一部の既知の削除拒否は、対象保持・警告設定復元を検証する分岐を含みます。Microsoft 365での成功を代用しません。VSTOホストの実表示・起動終了、実マウス操作、別PCへのインストールは手動確認が必要です。
+自動テストは専用ブック・独立したExcel 2013（15.0）インスタンスを使用します。一部の既知の削除拒否は、対象保持・警告設定復元を検証する分岐を含みます。Microsoft 365での成功を代用しません。VSTOホスト内の基本UIは専用テスト6項目で確認済みです。実マウス操作・実OS倍率・別PCへのインストールは手動確認が必要です。
 
 ## 記録
 
-- [Phase別の進行・検証記録](docs/rc.2-progress.md)
-- [RC仕様・変更範囲・既知の制約](docs/rc.2-progress.md)
-- [Microsoft 365実機確認チェックリスト](docs/rc.2-checklist.md)
+- [Phase別の進行・検証記録](docs/rc.3-progress.md)
+- [RC仕様・変更範囲・既知の制約](docs/rc.3-progress.md)
+- [Excel 2013操作確認・Microsoft 365の確認待ち項目](docs/rc.3-checklist.md)
 - [インストール・配布手順](docs/deployment.md)
 - 過去の記録：[v0.4.1](docs/v0.4.1.md)、[v0.5](docs/v0.5.md)、[v0.5.1](docs/v0.5.1.md)、[v0.6](docs/v0.6.md)。旧メニュー・確認仕様より本RCの説明を優先します。

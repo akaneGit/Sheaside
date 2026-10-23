@@ -207,6 +207,11 @@ namespace Sheaside.Controls
             filterPopup.SetBounds(Math.Max(0, ClientSize.Width - 204), top, Math.Max(1, Math.Min(200, ClientSize.Width)), Math.Max(1, Math.Min(320, ClientSize.Height - top)));
         }
         internal void CloseFilterPopup() { if (filterPopup != null) filterPopup.Visible = false; }
+        protected override void OnLeave(EventArgs e)
+        {
+            base.OnLeave(e);
+            CloseFilterPopup(); // Excel owns the native message loop; focus leaving the pane also dismisses it.
+        }
         internal void HandlePopupPointer(Point screenPoint)
         {
             if (filterPopup.Visible && !filterPopup.RectangleToScreen(filterPopup.ClientRectangle).Contains(screenPoint) &&
