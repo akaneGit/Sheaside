@@ -51,6 +51,7 @@ namespace Sheaside.Services
             preferences = new UserPreferences(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sheaside", "settings.xml"));
             if (preferences.LoadError != null) Trace.TraceWarning("Sheaside settings: {0}", preferences.LoadError);
             batches = new ExcelSheetBatchService(worksheets, () => preferences.ShowVeryHidden);
+            preferences.Changed += OnPreferencesChanged;
             // Events handle activation immediately; a conditional UI-thread timer
             // covers changes without dedicated events (visibility, tab color, close).
             refreshTimer = new Timer { Interval = 3000 };
@@ -187,9 +188,9 @@ namespace Sheaside.Services
             try
             {
                 pane = taskPanes.Add(view, "Sheaside", window);
-                pane.DockPosition = Office.MsoCTPDockPosition.msoCTPDockPositionRight;
-                pane.Width = 260;
-                pane.Visible = true;
+                pane.DockPosition = preferences.DockLeft ? Office.MsoCTPDockPosition.msoCTPDockPositionLeft : Office.MsoCTPDockPosition.msoCTPDockPositionRight;
+                pane.Width = 300;
+                pane.Visible = preferences.StartupVisible;
                 var entry = new PaneEntry { Pane = pane, View = view };
                 entry.WorksheetHandler = (sender, args) => ActivateWorksheet(handle, entry, args.Worksheet);
                 view.WorksheetRequested += entry.WorksheetHandler;
@@ -452,6 +453,21 @@ namespace Sheaside.Services
             Refresh();
         }
 
+        private void OnPreferencesChanged(object sender, EventArgs e)
+        {
+            if (disposed) return;
+            CancelCurrentDrag("設定が変更されたため、並び替えを中止しました。");
+            bool previous = operating; operating = true;
+            try
+            {
+                foreach (var entry in entries.Values)
+                    entry.Pane.DockPosition = preferences.DockLeft ? Office.MsoCTPDockPosition.msoCTPDockPositionLeft : Office.MsoCTPDockPosition.msoCTPDockPositionRight;
+            }
+            catch (Exception exception) when (IsOperationError(exception))
+            { MessageBox.Show(OperationErrorMessage(exception), "Sheaside — パネル位置"); }
+            finally { operating = previous; Refresh(); }
+        }
+
         private void RemovePane(int handle)
         {
             var entry = entries[handle];
@@ -475,6 +491,7 @@ namespace Sheaside.Services
         {
             if (disposed) return;
             disposed = true;
+            preferences.Changed -= OnPreferencesChanged;
             CancelCurrentDrag("並び替えを中止しました。");
             moveSession = null;
             refreshTimer.Stop();

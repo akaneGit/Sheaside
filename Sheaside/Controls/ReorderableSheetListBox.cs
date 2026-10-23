@@ -76,13 +76,14 @@ namespace Sheaside.Controls
         {
             if (e.Index < 0 || e.Index >= Items.Count) return;
             var item = (WorksheetItem)Items[e.Index];
-            e.DrawBackground();
             bool selected = (e.State & DrawItemState.Selected) != 0;
-            Color text = selected ? SystemColors.HighlightText : SystemColors.WindowText;
+            using (var background = new SolidBrush(selected ? SystemColors.Highlight : BackColor))
+                e.Graphics.FillRectangle(background, e.Bounds);
+            Color text = selected ? SystemColors.HighlightText : ForeColor;
             var swatch = new Rectangle(e.Bounds.Left + 5, e.Bounds.Top + 5, 10, Math.Max(5, e.Bounds.Height - 10));
-            using (var brush = new SolidBrush(item.TabColor.HasValue ? ColorTranslator.FromOle(item.TabColor.Value) : SystemColors.Window))
+            using (var brush = new SolidBrush(item.TabColor.HasValue ? ColorTranslator.FromOle(item.TabColor.Value) : BackColor))
                 e.Graphics.FillRectangle(brush, swatch);
-            using (var pen = new Pen(selected ? SystemColors.HighlightText : SystemColors.WindowText))
+            using (var pen = new Pen(selected ? SystemColors.HighlightText : ForeColor))
                 e.Graphics.DrawRectangle(pen, swatch);
             string caption = (item.Id == activeWorksheetId ? "● " : "　 ") + item.DisplayName;
             var bounds = new Rectangle(e.Bounds.Left + 22, e.Bounds.Top, Math.Max(0, e.Bounds.Width - 22), e.Bounds.Height);

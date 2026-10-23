@@ -215,6 +215,7 @@
     <Compile Include="Services\UserPreferences.cs" />
     <Compile Include="Services\ExcelSheetBatchService.cs" />
     <Compile Include="Controls\BatchDetailsDialog.cs" />
+    <Compile Include="Controls\PreferencesDialog.cs" />
     <Compile Include="Models\WorksheetDragEventArgs.cs" />
     <Compile Include="Controls\ReorderableSheetListBox.cs" />
     <Compile Include="Services\WorksheetMoveRules.cs" />

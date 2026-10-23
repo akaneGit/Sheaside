@@ -30,11 +30,47 @@ internal static partial class SmokeTests
                 Check(view.SelectedSheetIds.SequenceEqual(new[] { "v" }), "revealed rows do not silently regain selection");
             }
             Check(new UserPreferences(path).ShowVeryHidden, "settings persist across instances");
+            settings.SetOptions(true, PaneTheme.Dark, false, true);
+            var restored = new UserPreferences(path);
+            Check(restored.Theme == PaneTheme.Dark && !restored.StartupVisible && restored.DockLeft && restored.ShowVeryHidden, "all settings persist together");
+            int events = 0; restored.Changed += (s, e) => events++;
+            restored.SetOptions(true, PaneTheme.Dark, false, true);
+            Check(events == 0, "unchanged settings do not trigger redraw");
+            Reject(() => restored.SetOptions(false, (PaneTheme)99, true, false), "invalid theme rejected before saving");
+            using (var dialog = new PreferencesDialog(restored))
+                Check(dialog.Theme == PaneTheme.Dark && dialog.DockLeft && !dialog.StartupVisible && dialog.ShowVeryHidden, "settings dialog initializes saved values");
+            var failing = new UserPreferences(Path.Combine(path, "child.xml"));
+            try { failing.SetShowVeryHidden(true); throw new Exception("Expected write failure"); }
+            catch (IOException) { Check(!failing.ShowVeryHidden, "failed save keeps in-memory settings unchanged"); }
             File.WriteAllText(path, "invalid xml");
             var corrupt = new UserPreferences(path);
             Check(!corrupt.ShowVeryHidden && corrupt.LoadError != null, "corrupt settings fall back safely");
         }
         finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    private static void TestThemes()
+    {
+        var settings = new UserPreferences();
+        using (var first = new SheetListControl(settings))
+        using (var second = new SheetListControl(settings))
+        {
+            var rows = new[] { new WorksheetItem("a", "Sheet", true) };
+            first.ShowWorksheets("Book", rows, "a"); second.ShowWorksheets("Book", rows, "a");
+            var list = first.Controls.OfType<ReorderableSheetListBox>().Single();
+            var other = second.Controls.OfType<ReorderableSheetListBox>().Single();
+            settings.SetOptions(false, PaneTheme.Dark, true, false);
+            Check(list.BackColor == other.BackColor && (SystemInformation.HighContrast || list.BackColor.R < 50), "dark theme reaches all panes and respects high contrast");
+            Check(first.SelectedSheetIds.Single() == "a", "theme change preserves selection");
+            settings.SetOptions(false, PaneTheme.Light, true, false);
+            Check(SystemInformation.HighContrast || list.BackColor == System.Drawing.Color.White, "light theme uses light list background");
+            settings.SetOptions(false, PaneTheme.System, true, false);
+            Check(list.BackColor == System.Drawing.SystemColors.Window && list.ForeColor == System.Drawing.SystemColors.WindowText, "system theme restores system colors");
+            first.Size = new System.Drawing.Size(220, 400); first.PerformLayout();
+            Check(list.Width > 150 && list.Height > 80, "compact pane keeps usable list area");
+            first.Size = new System.Drawing.Size(500, 700); first.PerformLayout();
+            Check(list.Width > 400 && list.Height > 300, "list expands with pane size");
+        }
     }
 
     private static void TestFilters()

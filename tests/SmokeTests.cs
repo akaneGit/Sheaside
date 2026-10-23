@@ -33,6 +33,7 @@ internal static partial class SmokeTests
             TestBatch();
             TestReleaseSettings();
             TestFilters();
+            TestThemes();
             if (args.Contains("--excel"))
             {
                 if (!args.Contains("--batch-only")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); TestExcelSelection(); }

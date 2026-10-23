@@ -21,7 +21,6 @@ namespace Sheaside.Controls
         private string[] batchMenuTargets = new string[0];
         private bool updating;
         private readonly UserPreferences preferences;
-        private readonly CheckBox veryHiddenSetting;
         private IList<WorksheetItem> snapshot = new WorksheetItem[0];
         private string snapshotBook, snapshotActive;
         private readonly TextBox searchBox;
@@ -37,8 +36,8 @@ namespace Sheaside.Controls
             Size = new Size(260, 500);
             Font = new Font("Yu Gothic UI", 9F);
             Padding = new Padding(8);
-            workbookLabel = new Label { Dock = DockStyle.Top, Height = 32, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
-            statusLabel = new Label { Dock = DockStyle.Bottom, Height = 64, AutoEllipsis = true };
+            workbookLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+            statusLabel = new Label { Dock = DockStyle.Bottom, Height = 44, AutoEllipsis = true };
             selectionLabel = new Label { Dock = DockStyle.Bottom, Height = 26, AutoEllipsis = true };
             sheetList = new ReorderableSheetListBox
             {
@@ -97,18 +96,19 @@ namespace Sheaside.Controls
             Controls.Add(selectionLabel);
             Controls.Add(statusLabel);
             Controls.Add(addButton);
-            Controls.Add(workbookLabel);
-            veryHiddenSetting = new CheckBox { Text = "VeryHiddenシートを一覧に表示する", Dock = DockStyle.Top, Height = 38, Checked = preferences.ShowVeryHidden };
-            veryHiddenSetting.CheckedChanged += (s, e) =>
+            var header = new Panel { Dock = DockStyle.Top, Height = 32 };
+            var settingsButton = new Button { Text = "設定", Dock = DockStyle.Right, Width = 54, AccessibleName = "Sheasideの設定" };
+            header.Controls.Add(workbookLabel); header.Controls.Add(settingsButton);
+            settingsButton.Click += (s, e) =>
             {
-                try { preferences.SetShowVeryHidden(veryHiddenSetting.Checked); }
-                catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
+                using (var dialog = new PreferencesDialog(preferences))
                 {
-                    veryHiddenSetting.Checked = preferences.ShowVeryHidden;
-                    MessageBox.Show(this, "設定を保存できませんでした。\r\n" + ex.Message, "Sheaside");
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                    try { preferences.SetOptions(dialog.ShowVeryHidden, dialog.Theme, dialog.StartupVisible, dialog.DockLeft); }
+                    catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
+                    { MessageBox.Show(this, "設定を保存できませんでした。\r\n" + ex.Message, "Sheaside"); }
                 }
             };
-            Controls.Add(veryHiddenSetting);
             preferences.Changed += OnPreferencesChanged;
             var filters = new TableLayoutPanel { Dock = DockStyle.Top, Height = 88, ColumnCount = 2, RowCount = 3 };
             filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -129,6 +129,8 @@ namespace Sheaside.Controls
             visibilityFilter.SelectedIndexChanged += (s, e) => RefreshFilter();
             kindFilter.SelectedIndexChanged += (s, e) => RefreshFilter();
             Controls.Add(filters);
+            Controls.Add(header);
+            ApplyTheme();
         }
 
         public void SetFilter(string query, WorksheetVisibility? visibility, SheetKind? kind)
@@ -148,13 +150,36 @@ namespace Sheaside.Controls
             if (changingFilter) return;
             CancelDrag();
             sheetMenu.Close(); batchMenuTargets = new string[0];
+            statusLabel.Text = "";
             ShowWorksheets(snapshotBook, snapshot, snapshotActive);
         }
 
         private void OnPreferencesChanged(object sender, EventArgs e)
         {
-            veryHiddenSetting.Checked = preferences.ShowVeryHidden;
+            ApplyTheme();
             RefreshFilter();
+        }
+        private void ApplyTheme()
+        {
+            bool system = preferences.Theme == PaneTheme.System || SystemInformation.HighContrast;
+            bool dark = !system && preferences.Theme == PaneTheme.Dark;
+            Color background = system ? SystemColors.Control : dark ? Color.FromArgb(32, 32, 32) : Color.WhiteSmoke;
+            Color foreground = system ? SystemColors.ControlText : dark ? Color.WhiteSmoke : Color.FromArgb(24, 24, 24);
+            ApplyColors(this, background, foreground);
+            sheetList.BackColor = system ? SystemColors.Window : dark ? Color.FromArgb(24, 24, 24) : Color.White;
+            sheetList.ForeColor = system ? SystemColors.WindowText : foreground;
+            sheetMenu.BackColor = background; sheetMenu.ForeColor = foreground;
+            sheetList.Invalidate();
+        }
+        private static void ApplyColors(Control parent, Color background, Color foreground)
+        {
+            parent.BackColor = background; parent.ForeColor = foreground;
+            foreach (Control child in parent.Controls) ApplyColors(child, background, foreground);
+        }
+        protected override void OnSystemColorsChanged(EventArgs e)
+        {
+            base.OnSystemColorsChanged(e);
+            if (preferences != null && sheetList != null && sheetMenu != null) ApplyTheme();
         }
         private void RequestBatch(SheetBatchCommand command)
         {
