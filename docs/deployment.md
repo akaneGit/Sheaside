@@ -1,37 +1,66 @@
-# RCのインストール・配布
+# Sheaside 1.0.0-rc.2 インストール・配布
 
-Windows版Excel用VSTOアドインです。Excel Online、Mac、Office.jsには対応しません。
+現在の配布形式はMSIです。自動更新は行わず、GitHub Releasesから手動で取得します。リポジトリ内の旧ClickOnce発行スクリプト・プロジェクト設定は削除せず保存していますが、今後の配布には使いません。`.vsto`と`.dll.manifest`はMSI方式でもVSTOが必要とするファイルなので引き続き同梱します。
 
-## 開発環境
+## 利用環境と前提条件
 
-Visual Studio 2026 Community、Office/SharePoint開発ツール、.NET Framework 4.8開発ツール、VSTO Runtime、デスクトップExcelを用意します。Debug / Any CPUでビルドしてF5起動します。プロジェクトのデバッグ設定でMicrosoft 365のExcelを起動していることを確認してください。自動テスト環境はExcel 2013です。
+- WindowsのデスクトップExcel。開発連携テストはExcel 2013、配布先Microsoft 365の実機確認は未実施です。
+- [.NET Framework 4.8以上](https://learn.microsoft.com/en-us/dotnet/framework/install/on-windows-10)。MSIはRelease値528040以上を確認します。
+- [Visual Studio 2010 Tools for Office Runtime](https://www.microsoft.com/en-us/download/details.aspx?id=105522)。CLR 4対応ランタイムをOSに合わせて導入してください。MSIは32/64ビット両方の登録場所を確認します。前提ソフトは自動ダウンロードしません。
+- Excelを含むOfficeアプリケーションを終了してから導入・修復・更新・削除してください。
 
-署名PFXがない場合はVisual Studioの［署名］で開発用証明書を作成するか、`tools/New-DevelopmentCertificate.ps1`を使用します。既存PFXは上書きしません。証明書を変更した場合はThumbprintの差分も確認します。
+MSI自体はx86ですが、アドインはAny CPU、登録はHKCUの共有領域です。同じMSIで32/64ビットOfficeを想定しています。ARM版Office、全ユーザー一括導入は対象外です。両ビット数のMicrosoft 365実機確認が完了するまで互換性保証は行いません。
 
-## ローカル発行
+## インストール
+
+1. GitHub Releasesの`Sheaside-1.0.0-rc.2.zip`を展開するか、MSIと本手順を取得します。公開操作は別途実施します。
+2. `Get-FileHash .\Sheaside-1.0.0-rc.2.msi -Algorithm SHA256`で配布元のSHA256SUMS.txtと照合します。
+3. 旧ClickOnce版がある場合は先にWindowsの「インストールされているアプリ」からアンインストールします。異なる配布形式の自動移行は行いません。
+4. MSIをダブルクリックします。必要なら次のログ付きコマンドを使用します。ユーザー単位のため通常は管理者起動しません。
 
 ```powershell
-.\tools\Publish-ReleaseCandidate.ps1
-# 出力先を変更する場合
-.\tools\Publish-ReleaseCandidate.ps1 -OutputDirectory C:\Sheaside-RC
+msiexec /i "Sheaside-1.0.0-rc.2.msi" /L*v "Sheaside-install.log"
 ```
 
-既定出力先は`Sheaside/obj/ReleaseCandidate`です。`setup.exe`、`Sheaside.vsto`、`Application Files/Sheaside_1_0_0_0/`以下を一式で保持します。DLLだけではインストールできません。
+5. Excelを起動し、VSTOの信頼確認が出た場合は配布元を確認して判断します。リボンのSheasideと右側の一覧を確認してください。
 
-ReleaseのPublishターゲットを使用し、`IsWebBootstrapper=false`を明示しています。.NET Framework 4.8とVSTO Runtimeを前提条件に登録しました。前提ソフトはベンダーサイトから取得するため、未導入端末では接続と導入権限が必要です。
+配置先は`%LOCALAPPDATA%\Programs\Sheaside`、登録先は`HKCU\Software\Microsoft\Office\Excel\Addins\Sheaside`です。設定は`%LOCALAPPDATA%\Sheaside\settings.xml`に保持します。開発PCではVisual Studioビルドが同じ登録先を上書きするため、MSIの実機確認には別PC/別ユーザーを推奨します。
 
-本環境では警告・エラー0で発行し、Mageで`.vsto`とアプリケーションマニフェストの署名を検証済みです。setup.exeは開発用自己署名のため、Authenticodeでは信頼ルート未登録の`UnknownError`になります。署名の整合性と配布先での信頼は別です。証明書の信頼設定変更、実インストール、外部公開は実施していません。
+## 修復・削除・再インストール
 
-## 検証端末への導入と正式配布
+同一版を修復する場合はWindowsのアプリ管理から修復、または次のコマンドを使用します。
 
-1. Microsoft 365検証端末のWindows、Excelビルド・32/64bitを記録し、前提ランタイムを確認します。
-2. 配布用の信頼されたコード署名証明書を設定します。社内配布は組織の証明書配布ポリシーに従います。PFXや秘密鍵はパッケージへ含めません。
-3. Visual Studioの［発行］で正式な配布先・更新元・発行バージョンを設定して再発行します。本スクリプトは固定バージョンのローカルRC検証用で、自動更新元は設定しません。
-4. 発行フォルダー一式を検証端末へ渡し、Excelを終了してsetup.exeから導入します。前提条件導入済みなら.vstoからも導入できますが、前提条件を確認する経路はsetup.exeです。
-5. Excelの［オプション］→［アドイン］→［COMアドイン］でSheaside、リボン、パネルを確認します。表示されない場合は［使用できないアイテム］も確認します。
-6. [実機チェックリスト](v1.0-checklist.md)に沿って導入・更新・アンインストール・再導入も確認します。開発版と配布版は検証環境を分け、二重登録を避けます。
-7. 正式版ではRC表記を外し、ClickOnce発行バージョンをRCより大きくして再発行します。
+```powershell
+msiexec /fa "Sheaside-1.0.0-rc.2.msi" /L*v "Sheaside-repair.log"
+msiexec /x "Sheaside-1.0.0-rc.2.msi" /L*v "Sheaside-uninstall.log"
+```
 
-アンインストールはWindowsのインストール済みアプリから行います。個人設定`%LOCALAPPDATA%/Sheaside/settings.xml`は別に保持されます。初期化する場合はExcelをすべて終了し、このファイルをバックアップして移動してください。
+アンインストールではアドイン本体とMSIが登録したExcelアドイン値を削除します。ユーザー設定とExcelブックは残します。削除後に同じMSIを再実行すれば再インストールできます。現時点では修復・削除・再インストールの実動作はMicrosoft 365確認待ちです。
 
-配布方式はMicrosoftの[OfficeソリューションのClickOnce展開](https://learn.microsoft.com/en-us/visualstudio/vsto/deploying-an-office-solution-by-using-clickonce)に基づきます。管理者向けMSIや企業の一括配布パッケージは本RCでは作成していません。
+## 手動更新
+
+Excelを終了し、新バージョンのMSIをダウンロードして実行します。固定UpgradeCodeにより旧MSIを置き換え、設定を保持します。新しい版が入っている場合は古い版への上書きを拒否します。RC2のMSI内部バージョンは`0.99.2`（表示名`1.0.0-rc.2`）。正式版は`1.0.0`以上とし、将来の各リリースではMSIの数値バージョンを増加・ProductCodeを更新し、UpgradeCodeと既存Component GUIDを維持してください。同じリリース番号の異なるMSIを公開し直さないでください。
+
+## 署名と制約
+
+現在のMSIはAuthenticode未署名です。VSTOマニフェストはローカル開発証明書署名で、初回に発行元不明の確認が出る場合があります。企業ポリシーによってはロードを拒否されます。MSIは証明書を自動的に信頼ストアへ追加せず、セキュリティ設定も緩和しません。一般公開前には配布用コード署名証明書によるマニフェスト・MSI署名を整備してください。秘密鍵・PFXはGitや配布ZIPに含めません。
+
+MSI生成・ICE検証・データベース検証の成功は、別PCのインストール成功や証明書の信頼成立を意味しません。Microsoft 365の実機確認が必要です。Excel不在の環境をMSIは自動検出しません。Officeとランタイムの導入後に実行してください。
+
+## 開発者向けビルド
+
+```powershell
+.\tools\Verify-Phase.ps1
+.\tools\Build-Msi.ps1
+.\tools\Test-Msi.ps1 -Path .\artifacts\Sheaside-1.0.0-rc.2.msi
+```
+
+Visual StudioのVSTO開発ツール・署名用開発証明書に加えて.NET SDKと初回のNuGet接続が必要です。WiX 4.0.6を`Sheaside/obj/wix`に固定バージョンで導入します。`artifacts`にMSI、INSTALL.md、SHA256SUMS.txt、配布ZIPを生成します。成果物はGit対象外です。GitHub Releasesへのアップロードは自動では実施しません。
+
+MSIにはSheaside.dll、Sheaside.dll.manifest、Sheaside.vsto、Microsoft.Office.Tools.Common.v4.0.Utilities.dllの4ファイルを含めます。Excel Interopは型埋め込みを使用し、開発用PIAやPDB、証明書秘密鍵は含めません。
+
+## 設計の根拠
+
+- [Microsoft: VSTOのWindows Installer配布・前提条件・信頼](https://learn.microsoft.com/en-us/visualstudio/vsto/deploying-a-vsto-solution-by-using-windows-installer)
+- [Microsoft: VSTOアドインのレジストリ登録](https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins) — Manifestは`file:///[INSTALLFOLDER]Sheaside.vsto|vstolocal`とし、ClickOnceキャッシュへ転送しません。
+- [Microsoft: .NET Frameworkの検出](https://learn.microsoft.com/en-us/dotnet/framework/install/how-to-determine-which-versions-are-installed)

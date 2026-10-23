@@ -1,0 +1,40 @@
+[CmdletBinding()]
+param([Parameter(Mandatory=$true)][string]$Path)
+$ErrorActionPreference = 'Stop'
+$installer = New-Object -ComObject WindowsInstaller.Installer
+$database = $installer.OpenDatabase([IO.Path]::GetFullPath($Path), 0)
+$script:checks = 0
+function Assert-Msi($condition, $message) {
+    if (-not $condition) { throw "MSI: $message" }
+    $script:checks++
+}
+function Read-Rows([string]$query, [int]$columns) {
+    $view = $database.OpenView($query)
+    try {
+        [void]$view.Execute()
+        while ($record = $view.Fetch()) {
+            try { $row = @(); for ($i=1; $i -le $columns; $i++) { $row += $record.StringData($i) }; ,$row }
+            finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($record) }
+        }
+    } finally { [void]$view.Close(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($view) }
+}
+try {
+    $properties = @{}; Read-Rows 'SELECT `Property`, `Value` FROM `Property`' 2 | ForEach-Object { $properties[$_[0]]=$_[1] }
+    Assert-Msi ($properties.ProductVersion -eq '0.99.2') 'numeric RC version'
+    Assert-Msi (-not $properties.ContainsKey('ALLUSERS')) 'per-user installation'
+    Assert-Msi ($properties.UpgradeCode -eq '{E2087C97-A6B5-4089-B8F5-86DB64EBB425}') 'stable upgrade family'
+    $files = @(Read-Rows 'SELECT `FileName` FROM `File`' 1 | ForEach-Object { $_[0].Split('|')[-1] })
+    Assert-Msi ($files.Count -eq 4) 'only four runtime payload files'
+    foreach ($name in @('Sheaside.dll','Sheaside.dll.manifest','Sheaside.vsto','Microsoft.Office.Tools.Common.v4.0.Utilities.dll')) { Assert-Msi ($files -contains $name) "payload $name" }
+    $registry = @(Read-Rows 'SELECT `Root`, `Key`, `Name`, `Value` FROM `Registry`' 4)
+    Assert-Msi (@($registry | Where-Object { $_[0] -ne '1' }).Count -eq 0) 'only HKCU registration'
+    Assert-Msi (@($registry | Where-Object { $_[2] -eq 'Manifest' -and $_[3] -eq 'file:///[INSTALLFOLDER]Sheaside.vsto|vstolocal' }).Count -eq 1) 'local manifest, no ClickOnce cache'
+    Assert-Msi (@($registry | Where-Object { $_[2] -eq 'LoadBehavior' -and $_[3] -eq '#3' }).Count -eq 1) 'load on Excel startup'
+    Assert-Msi (@(Read-Rows 'SELECT `UpgradeCode` FROM `Upgrade`' 1).Count -ge 2) 'upgrade and downgrade detection'
+    Assert-Msi (@(Read-Rows 'SELECT `Condition` FROM `LaunchCondition`' 1).Count -ge 3) 'runtime and downgrade prerequisites'
+    Assert-Msi (@(Read-Rows 'SELECT `Cabinet` FROM `Media`' 1 | Where-Object { $_[0].StartsWith('#') }).Count -eq 1) 'embedded cabinet for single MSI distribution'
+    Write-Output "PASS: $script:checks MSI assertions (read-only; install/repair/uninstall not executed)"
+} finally {
+    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)
+    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($installer)
+}

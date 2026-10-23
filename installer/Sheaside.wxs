@@ -1,0 +1,41 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!-- MSI has a numeric version; RC 0.99.2 upgrades to final 1.0.0. -->
+  <Package Name="Sheaside 1.0.0-rc.2" Manufacturer="Sheaside" Version="0.99.2"
+           ProductCode="{5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2}"
+           UpgradeCode="{E2087C97-A6B5-4089-B8F5-86DB64EBB425}" Scope="perUser" Language="1033">
+    <MajorUpgrade DowngradeErrorMessage="A newer Sheaside version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPCOMMENTS" Value="Excel VSTO add-in. Close Excel before installation, repair, upgrade or removal." />
+    <Property Id="NET48">
+      <RegistrySearch Id="Net48" Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" Type="raw" Bitness="always32" />
+    </Property>
+    <Property Id="VSTO32">
+      <RegistrySearch Id="Vsto32" Root="HKLM" Key="SOFTWARE\Microsoft\VSTO Runtime Setup\v4R" Name="VSTORFeature_CLR40" Type="raw" Bitness="always32" />
+    </Property>
+    <Property Id="VSTO64">
+      <RegistrySearch Id="Vsto64" Root="HKLM" Key="SOFTWARE\Microsoft\VSTO Runtime Setup\v4R" Name="VSTORFeature_CLR40" Type="raw" Bitness="always64" />
+    </Property>
+    <Launch Condition="Installed OR NET48 &gt;= 528040" Message="Install Microsoft .NET Framework 4.8 or later, then run this installer again." />
+    <Launch Condition="Installed OR VSTO32 = 1 OR VSTO64 = 1" Message="Install Microsoft Visual Studio Tools for Office Runtime (CLR 4), then run this installer again." />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Sheaside">
+          <Component Id="Addin" Guid="{88493179-F1AC-441F-B5F4-7866E025FDF4}">
+            <File Id="AddinDll" Source="$(var.Payload)\Sheaside.dll" />
+            <File Id="ApplicationManifest" Source="$(var.Payload)\Sheaside.dll.manifest" />
+            <File Id="DeploymentManifest" Source="$(var.Payload)\Sheaside.vsto" />
+            <File Id="Utilities" Source="$(var.Payload)\Microsoft.Office.Tools.Common.v4.0.Utilities.dll" />
+            <RegistryKey Root="HKCU" Key="Software\Microsoft\Office\Excel\Addins\Sheaside">
+              <RegistryValue Name="FriendlyName" Type="string" Value="Sheaside" />
+              <RegistryValue Name="Description" Type="string" Value="Vertical sheet management for Excel" />
+              <RegistryValue Name="LoadBehavior" Type="integer" Value="3" />
+              <RegistryValue Name="Manifest" Type="string" Value="file:///[INSTALLFOLDER]Sheaside.vsto|vstolocal" KeyPath="yes" />
+            </RegistryKey>
+            <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Main" Title="Sheaside" Level="1"><ComponentRef Id="Addin" /></Feature>
+  </Package>
+</Wix>
