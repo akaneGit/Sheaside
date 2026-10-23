@@ -29,6 +29,11 @@ internal static partial class SmokeTests
             // Changes this test thread's key state, not global input or the user's cursor.
             SetKeyboardState(keyboard);
             Rectangle row = list.GetItemRectangle(index);
+            if (row.Top < 0 || row.Bottom > list.ClientSize.Height)
+            {
+                list.TopIndex = index;
+                row = list.GetItemRectangle(index);
+            }
             var point = new IntPtr(((row.Top + row.Height / 2) << 16) | 8);
             int flags = (right ? 2 : 1) | ((modifiers & Keys.Control) != 0 ? 8 : 0) | ((modifiers & Keys.Shift) != 0 ? 4 : 0);
             SendMessage(list.Handle, right ? 0x0204 : 0x0201, new IntPtr(flags), point);

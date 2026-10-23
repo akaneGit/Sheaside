@@ -36,4 +36,37 @@ internal static partial class SmokeTests
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
+
+    private static void TestFilters()
+    {
+        var settings = new UserPreferences(); settings.SetShowVeryHidden(true);
+        using (var view = new SheetListControl(settings))
+        {
+            var rows = new[] {
+                new WorksheetItem("a", "Sales 日本", true),
+                new WorksheetItem("b", "sales chart", WorksheetVisibility.Hidden, null, SheetKind.Chart),
+                new WorksheetItem("c", "Other", true),
+                new WorksheetItem("d", "sales secret", WorksheetVisibility.VeryHidden, null) };
+            view.ShowWorksheets("Book", rows, "a");
+            var list = view.Controls.OfType<ReorderableSheetListBox>().Single();
+            InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
+            view.SetFilter("SALES", null, null);
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "a", "b", "d" }) && view.IsFiltered, "search preserves tab order and prunes excluded selection");
+            view.SetFilter("", WorksheetVisibility.Hidden, SheetKind.Chart);
+            Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "b", "combined visibility and chart filters");
+            view.SetFilter("日本", null, SheetKind.Worksheet);
+            Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "a", "Japanese substring search");
+            view.SetFilter("absent", null, null);
+            Check(list.Items.Count == 0 && view.SelectedSheetIds.Length == 0, "empty search has no operation targets");
+            view.SetFilter("", null, null);
+            Check(list.Items.Count == 4 && view.SelectedSheetIds.Length == 0 && !view.IsFiltered, "clear filters does not resurrect selection");
+            view.SetFilter("new", null, null);
+            rows[2] = new WorksheetItem("c", "New title", true);
+            view.ShowWorksheets("Book", rows, "a");
+            Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "c", "external rename updates filtered snapshot");
+            settings.SetShowVeryHidden(false);
+            view.SetFilter("", WorksheetVisibility.VeryHidden, null);
+            Check(list.Items.Count == 0, "VeryHidden filter cannot bypass opt-in");
+        }
+    }
 }

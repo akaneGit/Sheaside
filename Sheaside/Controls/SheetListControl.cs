@@ -24,6 +24,9 @@ namespace Sheaside.Controls
         private readonly CheckBox veryHiddenSetting;
         private IList<WorksheetItem> snapshot = new WorksheetItem[0];
         private string snapshotBook, snapshotActive;
+        private readonly TextBox searchBox;
+        private readonly ComboBox visibilityFilter, kindFilter;
+        private bool changingFilter;
         public bool IsFiltered { get; private set; }
 
         public SheetListControl() : this(new UserPreferences()) { }
@@ -31,7 +34,7 @@ namespace Sheaside.Controls
         {
             this.preferences = preferences;
             AutoScaleMode = AutoScaleMode.Font;
-            Size = new Size(260, 400);
+            Size = new Size(260, 500);
             Font = new Font("Yu Gothic UI", 9F);
             Padding = new Padding(8);
             workbookLabel = new Label { Dock = DockStyle.Top, Height = 32, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
@@ -107,13 +110,51 @@ namespace Sheaside.Controls
             };
             Controls.Add(veryHiddenSetting);
             preferences.Changed += OnPreferencesChanged;
+            var filters = new TableLayoutPanel { Dock = DockStyle.Top, Height = 88, ColumnCount = 2, RowCount = 3 };
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            filters.Controls.Add(new Label { Text = "シート名を検索", AutoSize = true }, 0, 0);
+            var clear = new Button { Text = "絞り込み解除", Dock = DockStyle.Fill, AutoSize = true };
+            clear.Click += (s, e) => SetFilter("", null, null);
+            filters.Controls.Add(clear, 1, 0);
+            searchBox = new TextBox { Dock = DockStyle.Fill, AccessibleName = "シート名を部分一致検索" };
+            filters.Controls.Add(searchBox, 0, 1); filters.SetColumnSpan(searchBox, 2);
+            visibilityFilter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, AccessibleName = "表示状態フィルター" };
+            visibilityFilter.Items.AddRange(new object[] { "すべての状態", "Visible", "Hidden", "VeryHidden" });
+            kindFilter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, AccessibleName = "シート種類フィルター" };
+            kindFilter.Items.AddRange(new object[] { "すべての種類", "ワークシート", "グラフシート" });
+            visibilityFilter.SelectedIndex = kindFilter.SelectedIndex = 0;
+            filters.Controls.Add(visibilityFilter, 0, 2); filters.Controls.Add(kindFilter, 1, 2);
+            searchBox.TextChanged += (s, e) => RefreshFilter();
+            visibilityFilter.SelectedIndexChanged += (s, e) => RefreshFilter();
+            kindFilter.SelectedIndexChanged += (s, e) => RefreshFilter();
+            Controls.Add(filters);
+        }
+
+        public void SetFilter(string query, WorksheetVisibility? visibility, SheetKind? kind)
+        {
+            changingFilter = true;
+            try
+            {
+                searchBox.Text = query ?? "";
+                visibilityFilter.SelectedIndex = !visibility.HasValue ? 0 : visibility == WorksheetVisibility.Visible ? 1 : visibility == WorksheetVisibility.Hidden ? 2 : 3;
+                kindFilter.SelectedIndex = !kind.HasValue ? 0 : kind == SheetKind.Worksheet ? 1 : 2;
+            }
+            finally { changingFilter = false; }
+            RefreshFilter();
+        }
+        private void RefreshFilter()
+        {
+            if (changingFilter) return;
+            CancelDrag();
+            sheetMenu.Close(); batchMenuTargets = new string[0];
+            ShowWorksheets(snapshotBook, snapshot, snapshotActive);
         }
 
         private void OnPreferencesChanged(object sender, EventArgs e)
         {
-            CancelDrag();
             veryHiddenSetting.Checked = preferences.ShowVeryHidden;
-            ShowWorksheets(snapshotBook, snapshot, snapshotActive);
+            RefreshFilter();
         }
         private void RequestBatch(SheetBatchCommand command)
         {
@@ -176,7 +217,7 @@ namespace Sheaside.Controls
         private void UpdateSelectionSummary()
         {
             int count = sheetList.SelectedItems.Count;
-            selectionLabel.Text = count + "件選択中" + (count > 1 ? "（右クリックで一括操作）" : "");
+            selectionLabel.Text = count + "件選択中 / " + sheetList.Items.Count + "件表示";
             addButton.Enabled = count <= 1;
         }
 
@@ -200,7 +241,12 @@ namespace Sheaside.Controls
             if (IsDragging || sheetList.IsSelecting) return;
             snapshot = worksheets.ToArray(); snapshotBook = workbookName; snapshotActive = activeId;
             worksheets = worksheets.Where(i => preferences.ShowVeryHidden || i.Visibility != WorksheetVisibility.VeryHidden).ToArray();
-            IsFiltered = worksheets.Count != snapshot.Count;
+            string query = searchBox.Text;
+            int state = visibilityFilter.SelectedIndex, kind = kindFilter.SelectedIndex;
+            worksheets = worksheets.Where(i => i.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                (state == 0 || (state == 1 && i.IsVisible) || (state == 2 && i.Visibility == WorksheetVisibility.Hidden) || (state == 3 && i.Visibility == WorksheetVisibility.VeryHidden)) &&
+                (kind == 0 || (kind == 1 && i.Kind == SheetKind.Worksheet) || (kind == 2 && i.Kind == SheetKind.Chart))).ToArray();
+            IsFiltered = query.Length > 0 || state != 0 || kind != 0 || worksheets.Count != snapshot.Count;
             workbookLabel.Text = workbookName;
             CaptureSelection();
             selection.Reconcile(worksheets.Select(item => item.Id), activeId, preferredId);
@@ -226,7 +272,7 @@ namespace Sheaside.Controls
                 if (sheetList.Items.Count > 0)
                     sheetList.TopIndex = Math.Min(Math.Max(0, topIndex), sheetList.Items.Count - 1);
                 if (changed || statusLabel.Text.Length == 0)
-                    statusLabel.Text = worksheets.Count == 0 ? "シートがありません。" : "クリック、または選択して Enter で切り替えます。";
+                    statusLabel.Text = worksheets.Count == 0 ? "表示条件に一致するシートがありません。" : IsFiltered ? "絞り込み中は並び替えできません。" : "クリック、または選択して Enter で切り替えます。";
             }
             finally
             {
