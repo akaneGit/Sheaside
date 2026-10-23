@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace Sheaside.Models
 {
-    internal enum SheetBatchCommand { Delete, Hide, Unhide, SetColor, ClearColor, Duplicate }
+    internal enum SheetBatchCommand { Delete, Hide, Unhide, SetColor, ClearColor, Duplicate, VeryHide }
     internal enum SheetBatchStatus { NotProcessed, Succeeded, Skipped, Failed }
 
     internal sealed class SheetBatchEventArgs : EventArgs

@@ -31,6 +31,7 @@ namespace Sheaside.Services
         private readonly CustomTaskPaneCollection taskPanes;
         private readonly ExcelWorksheetService worksheets;
         private readonly ExcelSheetBatchService batches;
+        private readonly UserPreferences preferences;
         private readonly Dictionary<int, PaneEntry> entries = new Dictionary<int, PaneEntry>();
         private readonly Timer refreshTimer;
         private bool refreshing;
@@ -47,7 +48,9 @@ namespace Sheaside.Services
             this.application = application;
             this.taskPanes = taskPanes;
             worksheets = new ExcelWorksheetService(application);
-            batches = new ExcelSheetBatchService(worksheets);
+            preferences = new UserPreferences(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sheaside", "settings.xml"));
+            if (preferences.LoadError != null) Trace.TraceWarning("Sheaside settings: {0}", preferences.LoadError);
+            batches = new ExcelSheetBatchService(worksheets, () => preferences.ShowVeryHidden);
             // Events handle activation immediately; a conditional UI-thread timer
             // covers changes without dedicated events (visibility, tab color, close).
             refreshTimer = new Timer { Interval = 3000 };
@@ -179,7 +182,7 @@ namespace Sheaside.Services
 
         private PaneEntry CreatePane(Excel.Window window, int handle)
         {
-            var view = new SheetListControl();
+            var view = new SheetListControl(preferences);
             CustomTaskPane pane = null;
             try
             {
@@ -349,6 +352,8 @@ namespace Sheaside.Services
                     if (!confirmed) return;
                 }
                 result = batches.Execute(plan, confirmed, color);
+                if (plan.Items.Count == 1 && args.Command == SheetBatchCommand.Duplicate && result.Items[0].Status == SheetBatchStatus.Succeeded)
+                    entry.PreferredSelection = result.Items[0].CreatedId;
             }
             catch (Exception exception) when (IsOperationError(exception))
             {
@@ -359,7 +364,7 @@ namespace Sheaside.Services
                 operating = false;
                 Refresh(); // Actual Excel state, including partial success; prune deleted IDs.
             }
-            if (result == null || entry.View.IsDisposed) return;
+            if (result == null || entry.View.IsDisposed || (result.Error == null && result.Count(SheetBatchStatus.Failed) == 0)) return;
             entry.View.ShowStatus(result.Summary);
             operating = true;
             try
@@ -372,7 +377,7 @@ namespace Sheaside.Services
 
         private void StartDrag(int handle, PaneEntry entry, WorksheetDragStartingEventArgs args)
         {
-            if (disposed || operating || draggingEntry != null) return;
+            if (disposed || operating || draggingEntry != null || entry.View.IsFiltered) return;
             try
             {
                 moveSession = worksheets.CaptureMove(handle, args.WorksheetId, args.Order);

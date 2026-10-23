@@ -212,6 +212,7 @@
     <Compile Include="Models\SheetSelectionState.cs" />
     <Compile Include="Models\SheetBatch.cs" />
     <Compile Include="Services\SheetBatchRunner.cs" />
+    <Compile Include="Services\UserPreferences.cs" />
     <Compile Include="Services\ExcelSheetBatchService.cs" />
     <Compile Include="Controls\BatchDetailsDialog.cs" />
     <Compile Include="Models\WorksheetDragEventArgs.cs" />

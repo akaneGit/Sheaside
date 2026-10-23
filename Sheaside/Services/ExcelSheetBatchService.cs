@@ -16,13 +16,14 @@ namespace Sheaside.Services
             internal ExcelWorksheetService.OperationTarget Context { get; private set; }
             public SheetBatchCommand Command { get; private set; }
             public ReadOnlyCollection<WorksheetItem> Items { get; private set; }
-            public bool NeedsConfirmation { get { return Command == SheetBatchCommand.Delete || Command == SheetBatchCommand.Hide ||
-                (Command == SheetBatchCommand.Unhide && Items.Any(i => i.Visibility == WorksheetVisibility.VeryHidden)); } }
+            public bool NeedsConfirmation { get { return Command == SheetBatchCommand.Delete; } }
         }
 
         private readonly ExcelWorksheetService sheets;
+        private readonly Func<bool> allowVeryHidden;
         private bool executing;
-        public ExcelSheetBatchService(ExcelWorksheetService sheets) { this.sheets = sheets; }
+        public ExcelSheetBatchService(ExcelWorksheetService sheets, Func<bool> allowVeryHidden = null)
+        { this.sheets = sheets; this.allowVeryHidden = allowVeryHidden ?? (() => true); }
 
         public Plan Capture(int handle, IEnumerable<string> ids, SheetBatchCommand command)
         {
@@ -51,8 +52,10 @@ namespace Sheaside.Services
         private void ValidateRemaining(Plan plan, int start)
         {
             sheets.ValidateTarget(plan.Context);
+            if (!allowVeryHidden() && (plan.Command == SheetBatchCommand.VeryHide || plan.Items.Any(i => i.Visibility == WorksheetVisibility.VeryHidden)))
+                throw new InvalidOperationException("VeryHiddenの管理には設定を有効にしてください。");
             for (int i = start; i < plan.Items.Count; i++) Resolve(plan, plan.Items[i]);
-            if (plan.Command == SheetBatchCommand.Delete || plan.Command == SheetBatchCommand.Hide)
+            if (plan.Command == SheetBatchCommand.Delete || plan.Command == SheetBatchCommand.Hide || plan.Command == SheetBatchCommand.VeryHide)
             {
                 var pending = new HashSet<string>(plan.Items.Skip(start).Select(i => i.Id));
                 var current = sheets.GetWorksheets(plan.Context.Workbook);
@@ -85,9 +88,11 @@ namespace Sheaside.Services
                                 throw new InvalidOperationException("Excelが削除を完了しませんでした。");
                             break;
                         case SheetBatchCommand.Hide:
-                            skipped = outcome.Item.Visibility == WorksheetVisibility.Hidden;
-                            if (!skipped) sheets.HideWorksheet(target);
-                            if (target.Sheet.Visible != Excel.XlSheetVisibility.xlSheetHidden)
+                        case SheetBatchCommand.VeryHide:
+                            var visibility = plan.Command == SheetBatchCommand.VeryHide ? WorksheetVisibility.VeryHidden : WorksheetVisibility.Hidden;
+                            skipped = outcome.Item.Visibility == visibility;
+                            if (!skipped) sheets.SetVisibility(target, visibility);
+                            if ((int)target.Sheet.Visible != (int)visibility)
                                 throw new InvalidOperationException("非表示への変更を確認できませんでした。");
                             break;
                         case SheetBatchCommand.Unhide:

@@ -31,6 +31,7 @@ internal static partial class SmokeTests
                 TestPointerRegression();
             }
             TestBatch();
+            TestReleaseSettings();
             if (args.Contains("--excel"))
             {
                 if (!args.Contains("--batch-only")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); TestExcelSelection(); }
@@ -103,8 +104,10 @@ internal static partial class SmokeTests
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(menu, new object[] { new System.ComponentModel.CancelEventArgs() });
             list.SelectedIndex = -1;
+            SheetBatchEventArgs batch = null;
+            view.BatchCommandRequested += (s, e) => batch = e;
             menu.Items[3].PerformClick();
-            Check(command.Command == WorksheetCommand.Delete && command.Worksheet.Id == "Sheet2", "menu command retains opening target");
+            Check(batch != null && batch.Command == SheetBatchCommand.Delete && batch.Ids.Single() == "Sheet2", "menu command retains opening target");
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(menu, new object[] { new System.ComponentModel.CancelEventArgs() });
             Check(menu.Items[0].Enabled && !menu.Items[1].Enabled && !menu.Items[2].Enabled && !menu.Items[3].Enabled, "empty space allows only add");

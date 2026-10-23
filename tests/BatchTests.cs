@@ -40,16 +40,16 @@ internal static partial class SmokeTests
             InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
             var menu = list.ContextMenuStrip;
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(menu, new object[] { new CancelEventArgs() });
-            var batch = (ToolStripMenuItem)menu.Items[8];
-            Check(batch.Enabled && batch.Text.Contains("4") && batch.DropDownItems.Count == 6, "multi menu exposes six batch operations with count");
+            var batch = (ToolStripMenuItem)menu.Items[3];
+            Check(batch.Enabled && menu.Items.Count == 8, "unified menu has no batch submenu");
             SheetBatchEventArgs request = null;
             view.BatchCommandRequested += (s, e) => request = e;
             list.ClearSelected();
-            batch.DropDownItems[0].PerformClick();
+            batch.PerformClick();
             Check(request != null && request.Command == SheetBatchCommand.Delete && request.Ids.SequenceEqual(items.Select(i => i.Id)), "batch menu captures immutable target IDs");
             InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Escape));
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(menu, new object[] { new CancelEventArgs() });
-            Check(!batch.Enabled && menu.Items[3].Enabled, "single selection restores original menu");
+            Check(batch.Enabled && menu.Items[1].Enabled, "single selection uses same delete menu");
         }
     }
 
@@ -78,9 +78,11 @@ internal static partial class SmokeTests
             b.Visible = Excel.XlSheetVisibility.xlSheetHidden;
             chart.Visible = Excel.XlSheetVisibility.xlSheetVeryHidden;
             plan = capture(SheetBatchCommand.Unhide);
-            Check(plan.NeedsConfirmation && plan.Items.Any(i => i.Visibility == WorksheetVisibility.VeryHidden), "VeryHidden confirmation snapshot includes names");
+            Check(!plan.NeedsConfirmation && plan.Items.Any(i => i.Visibility == WorksheetVisibility.VeryHidden), "VeryHidden reveal no longer requires confirmation");
             result = batches.Execute(plan, false);
-            Check(result.Count(SheetBatchStatus.NotProcessed) == 3 && chart.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden, "VeryHidden cannot bypass batch confirmation");
+            Check(result.Count(SheetBatchStatus.Succeeded) == 2 && chart.Visible == Excel.XlSheetVisibility.xlSheetVisible, "VeryHidden reveals without confirmation");
+            b.Visible = Excel.XlSheetVisibility.xlSheetHidden;
+            chart.Visible = Excel.XlSheetVisibility.xlSheetVeryHidden;
             result = batches.Execute(capture(SheetBatchCommand.Hide), true);
             Check(result.Count(SheetBatchStatus.Succeeded) == 2 && result.Count(SheetBatchStatus.Skipped) == 1 && chart.Visible == Excel.XlSheetVisibility.xlSheetHidden, "mixed hide converts VeryHidden and skips Hidden");
             result = batches.Execute(capture(SheetBatchCommand.Unhide), false);
@@ -90,6 +92,14 @@ internal static partial class SmokeTests
             chart.Visible = Excel.XlSheetVisibility.xlSheetVeryHidden;
             result = batches.Execute(capture(SheetBatchCommand.Unhide), true);
             Check(result.Count(SheetBatchStatus.Succeeded) == 1 && result.Count(SheetBatchStatus.Skipped) == 2, "confirmed VeryHidden batch reveal");
+            result = batches.Execute(capture(SheetBatchCommand.VeryHide), false);
+            Check(result.Count(SheetBatchStatus.Succeeded) == 3 && chart.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden, "worksheet and chart bulk VeryHidden");
+            var guarded = new ExcelSheetBatchService(service, () => false);
+            Reject(() => guarded.Capture(handle, ids, SheetBatchCommand.Unhide), "disabled VeryHidden setting rejects hidden targets");
+            Reject(() => guarded.Capture(handle, new[] { service.GetWorksheetId(keep) }, SheetBatchCommand.VeryHide), "disabled VeryHidden setting rejects command");
+            Reject(() => batches.Capture(handle, new[] { service.GetWorksheetId(keep) }, SheetBatchCommand.VeryHide), "VeryHidden preserves last visible sheet");
+            result = batches.Execute(capture(SheetBatchCommand.Unhide), false);
+            Check(result.Count(SheetBatchStatus.Succeeded) == 3, "bulk VeryHidden round trip");
             a.Tab.Color = 255;
             result = batches.Execute(capture(SheetBatchCommand.SetColor), false, 255);
             Check(result.Count(SheetBatchStatus.Succeeded) == 2 && result.Count(SheetBatchStatus.Skipped) == 1 && service.GetTabColor(chart) == 255, "batch color and same-color skip including chart");

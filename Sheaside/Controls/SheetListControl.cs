@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Sheaside.Models;
+using Sheaside.Services;
 
 namespace Sheaside.Controls
 {
@@ -19,10 +20,18 @@ namespace Sheaside.Controls
         private WorksheetItem menuTarget;
         private string[] batchMenuTargets = new string[0];
         private bool updating;
+        private readonly UserPreferences preferences;
+        private readonly CheckBox veryHiddenSetting;
+        private IList<WorksheetItem> snapshot = new WorksheetItem[0];
+        private string snapshotBook, snapshotActive;
+        public bool IsFiltered { get; private set; }
 
-        public SheetListControl()
+        public SheetListControl() : this(new UserPreferences()) { }
+        public SheetListControl(UserPreferences preferences)
         {
+            this.preferences = preferences;
             AutoScaleMode = AutoScaleMode.Font;
+            Size = new Size(260, 400);
             Font = new Font("Yu Gothic UI", 9F);
             Padding = new Padding(8);
             workbookLabel = new Label { Dock = DockStyle.Top, Height = 32, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
@@ -48,40 +57,28 @@ namespace Sheaside.Controls
             sheetMenu = new ContextMenuStrip();
             sheetMenu.Items.Add("シートの追加", null, (sender, args) => RequestCommand(WorksheetCommand.Add, menuTarget));
             sheetMenu.Items.Add("名前の変更", null, (sender, args) => RequestCommand(WorksheetCommand.Rename, menuTarget));
-            sheetMenu.Items.Add("シートの複製", null, (sender, args) => RequestCommand(WorksheetCommand.Duplicate, menuTarget));
-            sheetMenu.Items.Add("シートの削除", null, (sender, args) => RequestCommand(WorksheetCommand.Delete, menuTarget));
-            var hide = sheetMenu.Items.Add("非表示にする", null, (sender, args) => RequestCommand(WorksheetCommand.Hide, menuTarget));
-            var unhide = sheetMenu.Items.Add("再表示", null, (sender, args) => RequestCommand(WorksheetCommand.Unhide, menuTarget));
-            var reveal = sheetMenu.Items.Add("VeryHiddenを再表示…", null, (sender, args) => RequestCommand(WorksheetCommand.RevealVeryHidden, menuTarget));
+            sheetMenu.Items.Add("複製", null, (sender, args) => RequestBatch(SheetBatchCommand.Duplicate));
+            sheetMenu.Items.Add("削除…", null, (sender, args) => RequestBatch(SheetBatchCommand.Delete));
+            var hide = sheetMenu.Items.Add("非表示にする", null, (sender, args) => RequestBatch(SheetBatchCommand.Hide));
+            var unhide = sheetMenu.Items.Add("再表示", null, (sender, args) => RequestBatch(SheetBatchCommand.Unhide));
+            var reveal = sheetMenu.Items.Add("VeryHiddenにする", null, (sender, args) => RequestBatch(SheetBatchCommand.VeryHide));
             var colors = new ToolStripMenuItem("タブの色");
-            colors.DropDownItems.Add("色を選択…", null, (sender, args) => RequestCommand(WorksheetCommand.SetTabColor, menuTarget));
-            colors.DropDownItems.Add("色なし", null, (sender, args) => RequestCommand(WorksheetCommand.ClearTabColor, menuTarget));
+            colors.DropDownItems.Add("色を選択…", null, (sender, args) => RequestBatch(SheetBatchCommand.SetColor));
+            colors.DropDownItems.Add("色なし", null, (sender, args) => RequestBatch(SheetBatchCommand.ClearColor));
             sheetMenu.Items.Add(colors);
-            var batchMenu = new ToolStripMenuItem("選択シートの一括操作");
-            foreach (var command in new[] { SheetBatchCommand.Delete, SheetBatchCommand.Hide, SheetBatchCommand.Unhide,
-                SheetBatchCommand.SetColor, SheetBatchCommand.ClearColor, SheetBatchCommand.Duplicate })
-            {
-                var captured = command;
-                batchMenu.DropDownItems.Add(BatchCommandName(command), null, (sender, args) =>
-                {
-                    if (!updating && !IsDragging && batchMenuTargets.Length > 1)
-                        BatchCommandRequested?.Invoke(this, new SheetBatchEventArgs(captured, batchMenuTargets));
-                });
-            }
-            sheetMenu.Items.Add(batchMenu);
             sheetMenu.Opening += (sender, args) =>
             {
                 menuTarget = sheetList.SelectedItem as WorksheetItem;
                 bool single = sheetList.SelectedItems.Count == 1;
                 sheetMenu.Items[0].Enabled = sheetList.SelectedItems.Count <= 1;
-                for (int i = 1; i < sheetMenu.Items.Count; i++) sheetMenu.Items[i].Enabled = single;
-                hide.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.Visible;
-                unhide.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.Hidden;
-                reveal.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.VeryHidden;
+                for (int i = 1; i < sheetMenu.Items.Count; i++) sheetMenu.Items[i].Enabled = sheetList.SelectedItems.Count > 0;
+                sheetMenu.Items[1].Enabled = single;
+                var selected = sheetList.SelectedItems.Cast<WorksheetItem>().ToArray();
+                hide.Enabled = selected.Any(i => i.Visibility != WorksheetVisibility.Hidden);
+                unhide.Enabled = selected.Any(i => !i.IsVisible);
+                reveal.Visible = preferences.ShowVeryHidden;
+                reveal.Enabled = preferences.ShowVeryHidden && selected.Any(i => i.Visibility != WorksheetVisibility.VeryHidden);
                 batchMenuTargets = SelectedSheetIds;
-                batchMenu.Visible = batchMenuTargets.Length > 1;
-                batchMenu.Enabled = batchMenuTargets.Length > 1;
-                batchMenu.Text = "選択した " + batchMenuTargets.Length + "件を一括操作";
             };
             sheetList.MouseDown += (sender, args) =>
             {
@@ -98,6 +95,30 @@ namespace Sheaside.Controls
             Controls.Add(statusLabel);
             Controls.Add(addButton);
             Controls.Add(workbookLabel);
+            veryHiddenSetting = new CheckBox { Text = "VeryHiddenシートを一覧に表示する", Dock = DockStyle.Top, Height = 38, Checked = preferences.ShowVeryHidden };
+            veryHiddenSetting.CheckedChanged += (s, e) =>
+            {
+                try { preferences.SetShowVeryHidden(veryHiddenSetting.Checked); }
+                catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
+                {
+                    veryHiddenSetting.Checked = preferences.ShowVeryHidden;
+                    MessageBox.Show(this, "設定を保存できませんでした。\r\n" + ex.Message, "Sheaside");
+                }
+            };
+            Controls.Add(veryHiddenSetting);
+            preferences.Changed += OnPreferencesChanged;
+        }
+
+        private void OnPreferencesChanged(object sender, EventArgs e)
+        {
+            CancelDrag();
+            veryHiddenSetting.Checked = preferences.ShowVeryHidden;
+            ShowWorksheets(snapshotBook, snapshot, snapshotActive);
+        }
+        private void RequestBatch(SheetBatchCommand command)
+        {
+            if (!updating && !IsDragging && batchMenuTargets.Length > 0)
+                BatchCommandRequested?.Invoke(this, new SheetBatchEventArgs(command, batchMenuTargets));
         }
 
         public event EventHandler<WorksheetRequestedEventArgs> WorksheetRequested;
@@ -112,6 +133,7 @@ namespace Sheaside.Controls
                 case SheetBatchCommand.Unhide: return "一括再表示";
                 case SheetBatchCommand.SetColor: return "一括タブ色変更…";
                 case SheetBatchCommand.ClearColor: return "一括で色なし";
+                case SheetBatchCommand.VeryHide: return "VeryHiddenにする";
                 default: return "一括複製";
             }
         }
@@ -176,6 +198,9 @@ namespace Sheaside.Controls
         public void ShowWorksheets(string workbookName, IList<WorksheetItem> worksheets, string activeId, string preferredId = null)
         {
             if (IsDragging || sheetList.IsSelecting) return;
+            snapshot = worksheets.ToArray(); snapshotBook = workbookName; snapshotActive = activeId;
+            worksheets = worksheets.Where(i => preferences.ShowVeryHidden || i.Visibility != WorksheetVisibility.VeryHidden).ToArray();
+            IsFiltered = worksheets.Count != snapshot.Count;
             workbookLabel.Text = workbookName;
             CaptureSelection();
             selection.Reconcile(worksheets.Select(item => item.Id), activeId, preferredId);
@@ -225,7 +250,7 @@ namespace Sheaside.Controls
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) sheetMenu.Dispose();
+            if (disposing) { preferences.Changed -= OnPreferencesChanged; sheetMenu.Dispose(); }
             base.Dispose(disposing);
         }
 

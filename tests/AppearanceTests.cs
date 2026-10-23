@@ -13,7 +13,8 @@ internal static partial class SmokeTests
 {
     private static void TestAppearance()
     {
-        using (var view = new SheetListControl { Size = new Size(260, 400) })
+        var settings = new UserPreferences(); settings.SetShowVeryHidden(true);
+        using (var view = new SheetListControl(settings) { Size = new Size(260, 400) })
         {
             var list = view.Controls.OfType<ListBox>().Single();
             var rows = Enumerable.Range(0, 40).Select(i => new WorksheetItem("s" + i, "Sheet " + i, true)).ToArray();
@@ -30,13 +31,13 @@ internal static partial class SmokeTests
             var menu = list.ContextMenuStrip;
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(menu, new object[] { new CancelEventArgs() });
-            Check(!menu.Items[4].Enabled && !menu.Items[5].Enabled && menu.Items[6].Enabled, "VeryHidden has dedicated menu");
+            Check(menu.Items[4].Enabled && menu.Items[5].Enabled && !menu.Items[6].Enabled, "VeryHidden can hide or reveal via unified menu");
             rows[20] = new WorksheetItem("s20", "Sheet 20", WorksheetVisibility.Hidden, null);
             view.ShowWorksheets("Book", rows, "s0");
             Check(((WorksheetItem)list.Items[20]).DisplayName.Contains("非表示"), "Hidden label distinct");
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(menu, new object[] { new CancelEventArgs() });
-            Check(!menu.Items[4].Enabled && menu.Items[5].Enabled && !menu.Items[6].Enabled, "Hidden menu excludes VeryHidden reveal");
+            Check(!menu.Items[4].Enabled && menu.Items[5].Enabled && menu.Items[6].Enabled, "Hidden can reveal or become VeryHidden");
             using (var bitmap = new Bitmap(260, 400))
             using (var graphics = Graphics.FromImage(bitmap))
             {

@@ -295,12 +295,16 @@ namespace Sheaside.Services
         }
 
         public void HideWorksheet(OperationTarget target)
+        { SetVisibility(target, WorksheetVisibility.Hidden); }
+
+        public void SetVisibility(OperationTarget target, WorksheetVisibility visibility)
         {
             ValidateTarget(target);
             if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
-            if (target.Sheet.Visible == Excel.XlSheetVisibility.xlSheetVisible && CountVisibleSheets(target.Workbook) <= 1)
+            if (!Enum.IsDefined(typeof(WorksheetVisibility), visibility)) throw new InvalidOperationException("不正な表示状態です。");
+            if (visibility != WorksheetVisibility.Visible && target.Sheet.Visible == Excel.XlSheetVisibility.xlSheetVisible && CountVisibleSheets(target.Workbook) <= 1)
                 throw new InvalidOperationException("最後の表示シートは非表示にできません。");
-            target.Sheet.Visible = Excel.XlSheetVisibility.xlSheetHidden;
+            target.Sheet.Visible = (Excel.XlSheetVisibility)visibility;
         }
 
         private static int CountVisibleSheets(Excel.Workbook workbook)
