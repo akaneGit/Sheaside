@@ -92,6 +92,12 @@ internal static partial class SmokeTests
             Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "b", "combined visibility and chart filters");
             view.SetFilter("日本", null, SheetKind.Worksheet);
             Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "a", "Japanese substring search");
+            int drags = 0;
+            view.DragStarting += (s, e) => drags++;
+            InvokeControl(list, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 8, 8, 0));
+            InvokeControl(list, "OnMouseMove", new MouseEventArgs(MouseButtons.Left, 0, 100, 100, 0));
+            Check(drags == 0 && !list.IsDragging, "filtered single row cannot initiate a drag");
+            InvokeControl(list, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, 100, 100, 0));
             view.SetFilter("absent", null, null);
             Check(list.Items.Count == 0 && view.SelectedSheetIds.Length == 0, "empty search has no operation targets");
             view.SetFilter("", null, null);
@@ -103,6 +109,12 @@ internal static partial class SmokeTests
             settings.SetShowVeryHidden(false);
             view.SetFilter("", WorksheetVisibility.VeryHidden, null);
             Check(list.Items.Count == 0, "VeryHidden filter cannot bypass opt-in");
+        }
+        using (var disposedView = new SheetListControl(settings))
+        {
+            disposedView.Dispose();
+            settings.SetOptions(false, PaneTheme.Dark, false, true);
+            Check(disposedView.IsDisposed, "disposed view detaches shared settings event");
         }
     }
 }

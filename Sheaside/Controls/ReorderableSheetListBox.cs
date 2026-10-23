@@ -28,6 +28,7 @@ namespace Sheaside.Controls
         private bool collapseOnClick;
         public Keys PointerModifiers { get; private set; }
         public bool IsSelecting { get; private set; }
+        public bool ReorderEnabled { get; set; } = true;
 
         [DllImport("user32.dll")]
         private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
@@ -134,7 +135,7 @@ namespace Sheaside.Controls
         {
             base.OnMouseMove(e);
             if (pointerTracking && blockDragGesture && OutsideDragThreshold(e.Location)) consumedClick = true;
-            if (e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging || SelectedItems.Count > 1) return;
+            if (!ReorderEnabled || e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging || SelectedItems.Count > 1) return;
             if (!OutsideDragThreshold(e.Location)) return;
             sourceIndex = Items.IndexOf(mouseDownItem);
             if (sourceIndex < 0) { mouseDownItem = null; return; }

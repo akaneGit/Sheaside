@@ -36,6 +36,7 @@ namespace Sheaside.Services
         private readonly Timer refreshTimer;
         private bool refreshing;
         private bool disposed;
+        private bool started;
         private bool operating;
         private int? activeHandle;
         private PaneEntry draggingEntry;
@@ -62,6 +63,9 @@ namespace Sheaside.Services
 
         public void Start()
         {
+            if (disposed) throw new ObjectDisposedException(nameof(SheetPaneManager));
+            if (started) return;
+            started = true;
             application.WindowActivate += OnWindowActivate;
             application.WorkbookActivate += OnWorkbookActivate;
             application.SheetActivate += OnSheetActivate;
@@ -497,10 +501,18 @@ namespace Sheaside.Services
             refreshTimer.Stop();
             refreshTimer.Tick -= OnRefresh;
             refreshTimer.Dispose();
-            application.WindowActivate -= OnWindowActivate;
-            application.WorkbookActivate -= OnWorkbookActivate;
-            application.SheetActivate -= OnSheetActivate;
-            application.WindowDeactivate -= OnWindowDeactivate;
+            // Office can disconnect its event source before add-in shutdown.
+            // Attempt every detach and still release managed state afterwards.
+            foreach (Action detach in new Action[] {
+                () => application.WindowActivate -= OnWindowActivate,
+                () => application.WorkbookActivate -= OnWorkbookActivate,
+                () => application.SheetActivate -= OnSheetActivate,
+                () => application.WindowDeactivate -= OnWindowDeactivate })
+            {
+                try { detach(); }
+                catch (Exception exception) when (IsOperationError(exception))
+                { Trace.TraceWarning("Sheaside shutdown: {0}", exception.Message); }
+            }
             foreach (var entry in entries.Values)
             {
                 entry.Pane.VisibleChanged -= OnVisibleChanged;
@@ -510,6 +522,7 @@ namespace Sheaside.Services
                 DetachDragHandlers(entry);
             }
             entries.Clear();
+            draggingEntry = null;
             worksheets.ClearIdentities();
             // VSTO owns task pane/control disposal at shutdown. Remove must not be
             // called here: the collection may already have been disposed by VSTO.

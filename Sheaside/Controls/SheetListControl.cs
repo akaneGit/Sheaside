@@ -272,6 +272,7 @@ namespace Sheaside.Controls
                 (state == 0 || (state == 1 && i.IsVisible) || (state == 2 && i.Visibility == WorksheetVisibility.Hidden) || (state == 3 && i.Visibility == WorksheetVisibility.VeryHidden)) &&
                 (kind == 0 || (kind == 1 && i.Kind == SheetKind.Worksheet) || (kind == 2 && i.Kind == SheetKind.Chart))).ToArray();
             IsFiltered = query.Length > 0 || state != 0 || kind != 0 || worksheets.Count != snapshot.Count;
+            sheetList.ReorderEnabled = !IsFiltered;
             workbookLabel.Text = workbookName;
             CaptureSelection();
             selection.Reconcile(worksheets.Select(item => item.Id), activeId, preferredId);

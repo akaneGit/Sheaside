@@ -19,7 +19,14 @@ namespace Sheaside
         {
             PaneManager = new SheetPaneManager(Application, CustomTaskPanes);
             PaneManager.StateChanged += OnPaneStateChanged;
-            PaneManager.Start();
+            try { PaneManager.Start(); }
+            catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException || exception is InvalidOperationException)
+            {
+                PaneManager.StateChanged -= OnPaneStateChanged;
+                PaneManager.Dispose();
+                PaneManager = null;
+                System.Windows.Forms.MessageBox.Show("Sheasideを起動できませんでした。Excelを再起動してお試しください。\r\n" + exception.Message, "Sheaside");
+            }
             ribbon?.Invalidate();
         }
 
