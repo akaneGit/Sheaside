@@ -109,6 +109,23 @@ internal static partial class SmokeTests
             settings.SetShowVeryHidden(false);
             view.SetFilter("", WorksheetVisibility.VeryHidden, null);
             Check(list.Items.Count == 0, "VeryHidden filter cannot bypass opt-in");
+            view.SetFilter("sales", null, null);
+            Check(!view.HasFacetFilter && view.IsFiltered, "text search is independent of facet indicator");
+            view.Size = new System.Drawing.Size(190, 300);
+            view.ToggleFilterPopup();
+            Check(view.FilterPopup.Right <= view.ClientSize.Width && view.FilterPopup.Bottom <= view.ClientSize.Height, "popup stays inside narrow pane");
+            var options = view.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().ToArray();
+            Check(options.All(b => !b.Text.Contains("VeryHidden")), "VeryHidden not offered when setting off");
+            options.Single(b => b.Text.Contains("非表示")).PerformClick();
+            Check(view.HasFacetFilter && list.Items.Count == 1, "popup applies state while preserving query");
+            view.ToggleFilterPopup();
+            view.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().Single(b => b.Text == "フィルター解除").PerformClick();
+            Check(!view.HasFacetFilter && list.Items.Count == 2 && view.IsFiltered, "one-click facet reset keeps search");
+            settings.SetShowVeryHidden(true);
+            view.SetFilter("", WorksheetVisibility.VeryHidden, null);
+            view.ToggleFilterPopup();
+            settings.SetShowVeryHidden(false);
+            Check(!view.FilterPopup.Visible && !view.HasFacetFilter && !list.Items.Cast<WorksheetItem>().Any(i => i.Visibility == WorksheetVisibility.VeryHidden), "setting off dismisses popup and removes obsolete VeryHidden facet");
         }
         using (var disposedView = new SheetListControl(settings))
         {

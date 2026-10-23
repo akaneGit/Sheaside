@@ -26,7 +26,12 @@ namespace Sheaside.Controls
         private IList<WorksheetItem> snapshot = new WorksheetItem[0];
         private string snapshotBook, snapshotActive;
         private readonly TextBox searchBox;
-        private readonly ComboBox visibilityFilter, kindFilter;
+        private int visibilityFilter, kindFilter;
+        private readonly Button filterButton;
+        private readonly Label filterSummary;
+        private readonly Panel filterPopup;
+        internal bool HasFacetFilter { get { return visibilityFilter != 0 || kindFilter != 0; } }
+        internal Panel FilterPopup { get { return filterPopup; } }
         private bool changingFilter;
         public bool IsFiltered { get; private set; }
 
@@ -90,6 +95,7 @@ namespace Sheaside.Controls
             };
             sheetList.MouseDown += (sender, args) =>
             {
+                if (filterPopup != null) filterPopup.Visible = false;
                 if (args.Button == MouseButtons.Left)
                     selection.PreserveSelection = (sheetList.PointerModifiers & (Keys.Control | Keys.Shift)) != 0;
                 CaptureSelection();
@@ -125,25 +131,28 @@ namespace Sheaside.Controls
                 }
             };
             preferences.Changed += OnPreferencesChanged;
-            var filters = new TableLayoutPanel { Dock = DockStyle.Top, Height = 88, ColumnCount = 2, RowCount = 3 };
-            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            filters.Controls.Add(new Label { Text = "シート名を検索", AutoSize = true }, 0, 0);
-            var clear = new Button { Text = "絞り込み解除", Dock = DockStyle.Fill, AutoSize = true };
-            clear.Click += (s, e) => SetFilter("", null, null);
-            filters.Controls.Add(clear, 1, 0);
+            var filters = new Panel { Dock = DockStyle.Top, Height = 58 };
+            var searchRow = new Panel { Dock = DockStyle.Top, Height = 28 };
             searchBox = new TextBox { Dock = DockStyle.Fill, AccessibleName = "シート名を部分一致検索" };
-            filters.Controls.Add(searchBox, 0, 1); filters.SetColumnSpan(searchBox, 2);
-            visibilityFilter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, AccessibleName = "表示状態フィルター" };
-            visibilityFilter.Items.AddRange(new object[] { "すべての状態", "Visible", "Hidden", "VeryHidden" });
-            kindFilter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill, AccessibleName = "シート種類フィルター" };
-            kindFilter.Items.AddRange(new object[] { "すべての種類", "ワークシート", "グラフシート" });
-            visibilityFilter.SelectedIndex = kindFilter.SelectedIndex = 0;
-            filters.Controls.Add(visibilityFilter, 0, 2); filters.Controls.Add(kindFilter, 1, 2);
+            filterButton = new Button { Dock = DockStyle.Right, Width = 30, AccessibleName = "状態と種類のフィルター" };
+            filterButton.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(HasFacetFilter ? Color.ForestGreen : filterButton.ForeColor, 2))
+                    e.Graphics.DrawPolygon(pen, new[] { new Point(7, 7), new Point(22, 7), new Point(17, 13), new Point(17, 21), new Point(12, 18), new Point(12, 13) });
+            };
+            filterButton.Click += (s, e) => ToggleFilterPopup();
+            searchRow.Controls.Add(searchBox); searchRow.Controls.Add(filterButton);
+            filterSummary = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
+            var clear = new Button { Text = "解除", Dock = DockStyle.Right, Width = 48, AccessibleName = "状態・種類フィルターを解除" };
+            clear.Click += (s, e) => SetFilter(searchBox.Text, null, null);
+            var summaryRow = new Panel { Dock = DockStyle.Fill };
+            summaryRow.Controls.Add(filterSummary); summaryRow.Controls.Add(clear);
+            filters.Controls.Add(summaryRow); filters.Controls.Add(searchRow);
             searchBox.TextChanged += (s, e) => RefreshFilter();
-            visibilityFilter.SelectedIndexChanged += (s, e) => RefreshFilter();
-            kindFilter.SelectedIndexChanged += (s, e) => RefreshFilter();
             Controls.Add(filters);
+            filterPopup = new Panel { Visible = false, BorderStyle = BorderStyle.FixedSingle, AutoScroll = true };
+            Controls.Add(filterPopup);
+            SizeChanged += (s, e) => PositionFilterPopup();
             Controls.Add(header);
             ApplyTheme();
         }
@@ -154,15 +163,58 @@ namespace Sheaside.Controls
             try
             {
                 searchBox.Text = query ?? "";
-                visibilityFilter.SelectedIndex = !visibility.HasValue ? 0 : visibility == WorksheetVisibility.Visible ? 1 : visibility == WorksheetVisibility.Hidden ? 2 : 3;
-                kindFilter.SelectedIndex = !kind.HasValue ? 0 : kind == SheetKind.Worksheet ? 1 : 2;
+                visibilityFilter = !visibility.HasValue ? 0 : visibility == WorksheetVisibility.Visible ? 1 : visibility == WorksheetVisibility.Hidden ? 2 : 3;
+                kindFilter = !kind.HasValue ? 0 : kind == SheetKind.Worksheet ? 1 : 2;
             }
             finally { changingFilter = false; }
             RefreshFilter();
         }
+        internal void ToggleFilterPopup()
+        {
+            if (filterPopup.Visible) { filterPopup.Visible = false; return; }
+            foreach (Control child in filterPopup.Controls.Cast<Control>().ToArray()) child.Dispose();
+            var contents = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            contents.Controls.Add(new Label { Text = "状態", AutoSize = true });
+            string[] states = { "すべて", "表示", "非表示", "VeryHidden" };
+            for (int i = 0; i < (preferences.ShowVeryHidden ? 4 : 3); i++)
+            {
+                int value = i;
+                var button = new Button { Text = (visibilityFilter == i ? "✓ " : "　") + states[i], Width = 170, Height = 26 };
+                button.Click += (s, e) => { visibilityFilter = value; filterPopup.Visible = false; RefreshFilter(); };
+                contents.Controls.Add(button);
+            }
+            contents.Controls.Add(new Label { Text = "種類", AutoSize = true });
+            string[] kinds = { "すべて", "ワークシート", "グラフシート" };
+            for (int i = 0; i < 3; i++)
+            {
+                int value = i;
+                var button = new Button { Text = (kindFilter == i ? "✓ " : "　") + kinds[i], Width = 170, Height = 26 };
+                button.Click += (s, e) => { kindFilter = value; filterPopup.Visible = false; RefreshFilter(); };
+                contents.Controls.Add(button);
+            }
+            var clear = new Button { Text = "フィルター解除", Width = 170, Height = 28 };
+            clear.Click += (s, e) => { filterPopup.Visible = false; SetFilter(searchBox.Text, null, null); };
+            contents.Controls.Add(clear);
+            filterPopup.Controls.Add(contents);
+            ApplyTheme();
+            PositionFilterPopup(); filterPopup.Visible = true; filterPopup.BringToFront();
+        }
+        private void PositionFilterPopup()
+        {
+            if (filterPopup == null || filterButton == null) return;
+            int top = Math.Min(PointToClient(filterButton.PointToScreen(new Point(0, filterButton.Height))).Y, Math.Max(0, ClientSize.Height - 80));
+            filterPopup.SetBounds(Math.Max(0, ClientSize.Width - 204), top, Math.Max(1, Math.Min(200, ClientSize.Width)), Math.Max(1, Math.Min(320, ClientSize.Height - top)));
+        }
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Escape && filterPopup.Visible) { filterPopup.Visible = false; return true; }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
         private void RefreshFilter()
         {
             if (changingFilter) return;
+            filterSummary.Text = (visibilityFilter == 0 ? "状態:すべて" : new[] { "", "表示", "非表示", "VeryHidden" }[visibilityFilter]) + " / " + (kindFilter == 0 ? "種類:すべて" : kindFilter == 1 ? "ワークシート" : "グラフシート");
+            filterButton.Invalidate();
             CancelDrag();
             sheetMenu.Close(); batchMenuTargets = new string[0];
             ShowWorksheets(snapshotBook, snapshot, snapshotActive);
@@ -171,6 +223,8 @@ namespace Sheaside.Controls
         private void OnPreferencesChanged(object sender, EventArgs e)
         {
             ApplyTheme();
+            if (!preferences.ShowVeryHidden && visibilityFilter == 3) visibilityFilter = 0;
+            filterPopup.Visible = false;
             RefreshFilter();
         }
         private void ApplyTheme()
@@ -217,7 +271,7 @@ namespace Sheaside.Controls
                 default: return "一括複製";
             }
         }
-        public bool IsMenuOpen { get { return sheetMenu.Visible; } }
+        public bool IsMenuOpen { get { return sheetMenu.Visible || filterPopup.Visible; } }
         public bool IsDragging { get { return sheetList.IsDragging; } }
         public event EventHandler<WorksheetDragStartingEventArgs> DragStarting
         {
@@ -282,7 +336,7 @@ namespace Sheaside.Controls
             snapshot = worksheets.ToArray(); snapshotBook = workbookName; snapshotActive = activeId;
             worksheets = worksheets.Where(i => preferences.ShowVeryHidden || i.Visibility != WorksheetVisibility.VeryHidden).ToArray();
             string query = searchBox.Text;
-            int state = visibilityFilter.SelectedIndex, kind = kindFilter.SelectedIndex;
+            int state = visibilityFilter, kind = kindFilter;
             worksheets = worksheets.Where(i => i.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 &&
                 (state == 0 || (state == 1 && i.IsVisible) || (state == 2 && i.Visibility == WorksheetVisibility.Hidden) || (state == 3 && i.Visibility == WorksheetVisibility.VeryHidden)) &&
                 (kind == 0 || (kind == 1 && i.Kind == SheetKind.Worksheet) || (kind == 2 && i.Kind == SheetKind.Chart))).ToArray();
