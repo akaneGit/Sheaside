@@ -124,7 +124,7 @@ namespace Sheaside.Controls
             header.Controls.Add(workbookLabel); header.Controls.Add(settingsButton);
             settingsButton.Click += (s, e) =>
             {
-                using (var dialog = new PreferencesDialog(preferences))
+                using (var dialog = new PreferencesDialog(preferences, officeTheme))
                 {
                     if (dialog.ShowDialog(this) != DialogResult.OK) return;
                     try { preferences.SetOptions(dialog.ShowVeryHidden, dialog.StartupVisible); }
@@ -252,20 +252,11 @@ namespace Sheaside.Controls
         }
         private void ApplyTheme()
         {
-            bool system = officeTheme == OfficeTheme.System || SystemInformation.HighContrast;
-            bool dark = !system && (officeTheme == OfficeTheme.Black || officeTheme == OfficeTheme.DarkGray);
-            Color background = system ? SystemColors.Control : officeTheme == OfficeTheme.DarkGray ? Color.FromArgb(68, 68, 68) : dark ? Color.FromArgb(32, 32, 32) : officeTheme == OfficeTheme.LightGray ? Color.Gainsboro : Color.WhiteSmoke;
-            Color foreground = system ? SystemColors.ControlText : dark ? Color.WhiteSmoke : Color.FromArgb(24, 24, 24);
-            ApplyColors(this, background, foreground);
-            sheetList.BackColor = system ? SystemColors.Window : officeTheme == OfficeTheme.DarkGray ? Color.FromArgb(58, 58, 58) : dark ? Color.FromArgb(24, 24, 24) : Color.White;
-            sheetList.ForeColor = system ? SystemColors.WindowText : foreground;
-            sheetMenu.BackColor = background; sheetMenu.ForeColor = foreground;
+            UiAppearance.Apply(this, officeTheme);
+            sheetList.BackColor = UiAppearance.Window(officeTheme);
+            sheetList.ForeColor = UiAppearance.SystemTheme(officeTheme) ? SystemColors.WindowText : ForeColor;
+            sheetMenu.BackColor = BackColor; sheetMenu.ForeColor = ForeColor;
             sheetList.Invalidate();
-        }
-        private static void ApplyColors(Control parent, Color background, Color foreground)
-        {
-            parent.BackColor = background; parent.ForeColor = foreground;
-            foreach (Control child in parent.Controls) ApplyColors(child, background, foreground);
         }
         protected override void OnSystemColorsChanged(EventArgs e)
         {

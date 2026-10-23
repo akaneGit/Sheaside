@@ -40,6 +40,22 @@ internal static partial class SmokeTests
             Check(new UserPreferences(path).LoadError == null && !new UserPreferences(path).StartupVisible, "obsolete settings ignored" );
             using (var dialog = new PreferencesDialog(restored))
                 Check(!dialog.StartupVisible && dialog.ShowVeryHidden, "settings dialog initializes saved values");
+            foreach (float scale in new[] { 1F, 1.25F, 1.5F })
+                using (var dialog = new PreferencesDialog(restored, OfficeTheme.Black))
+                {
+                    dialog.StartPosition = FormStartPosition.Manual; dialog.Location = new System.Drawing.Point(-10000, -10000);
+                    dialog.Show(); dialog.Scale(new System.Drawing.SizeF(scale, scale)); dialog.PerformLayout();
+                    var layout = dialog.Controls.OfType<TableLayoutPanel>().Single();
+                    var descriptions = layout.Controls.OfType<Label>().ToArray();
+                    Check(dialog.ClientSize.Width >= 440 * scale && layout.Bottom <= dialog.ClientSize.Height - dialog.Padding.Bottom, "whole settings layout fits client area at scale " + scale);
+                    Check(descriptions.Length == 2 && descriptions.Any(l => l.Text.Contains("新しいウィンドウを開く")), "settings explain Excel window command at scale " + scale);
+                    Check(descriptions.All(l => l.Height >= l.GetPreferredSize(new System.Drawing.Size(l.Width, 0)).Height && l.Right <= layout.ClientSize.Width), "settings descriptions fit at scale " + scale);
+                    Check(dialog.BackColor == UiAppearance.Background(OfficeTheme.Black) && descriptions.All(l => l.ForeColor == dialog.ForeColor), "settings inherit Office theme at scale " + scale);
+                    Check(layout.Controls.OfType<CheckBox>().Select(c => c.Left).Distinct().Count() == 1, "settings checkbox alignment at scale " + scale);
+                    if (scale == 1F) using (var bitmap = new System.Drawing.Bitmap(dialog.Width, dialog.Height))
+                    { dialog.DrawToBitmap(bitmap, new System.Drawing.Rectangle(System.Drawing.Point.Empty, dialog.Size)); bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc3-settings.png")); }
+                    dialog.Close();
+                }
             var failing = new UserPreferences(Path.Combine(path, "child.xml"));
             try { failing.SetShowVeryHidden(true); throw new Exception("Expected write failure"); }
             catch (IOException) { Check(!failing.ShowVeryHidden, "failed save keeps in-memory settings unchanged"); }

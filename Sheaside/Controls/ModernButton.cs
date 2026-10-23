@@ -2,9 +2,28 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Sheaside.Services;
 
 namespace Sheaside.Controls
 {
+    internal static class UiAppearance
+    {
+        internal static bool SystemTheme(OfficeTheme theme) { return theme == OfficeTheme.System || SystemInformation.HighContrast; }
+        internal static Color Background(OfficeTheme theme)
+        {
+            return SystemTheme(theme) ? SystemColors.Control : theme == OfficeTheme.DarkGray ? Color.FromArgb(68, 68, 68) :
+                theme == OfficeTheme.Black ? Color.FromArgb(32, 32, 32) : theme == OfficeTheme.LightGray ? Color.Gainsboro : Color.WhiteSmoke;
+        }
+        internal static Color Foreground(OfficeTheme theme)
+        { return SystemTheme(theme) ? SystemColors.ControlText : theme == OfficeTheme.DarkGray || theme == OfficeTheme.Black ? Color.WhiteSmoke : Color.FromArgb(24, 24, 24); }
+        internal static Color Window(OfficeTheme theme)
+        { return SystemTheme(theme) ? SystemColors.Window : theme == OfficeTheme.DarkGray ? Color.FromArgb(58, 58, 58) : theme == OfficeTheme.Black ? Color.FromArgb(24, 24, 24) : Color.White; }
+        internal static void Apply(Control parent, OfficeTheme theme)
+        {
+            parent.BackColor = Background(theme); parent.ForeColor = Foreground(theme);
+            foreach (Control child in parent.Controls) Apply(child, theme);
+        }
+    }
     internal enum LineIcon { None, Add, Delete, Search, Filter, Settings }
 
     // Original geometric artwork, drawn in a 16-unit coordinate system; no external font/assets.
