@@ -149,7 +149,7 @@ namespace Sheaside.Services
             return target;
         }
 
-        private void ValidateTarget(OperationTarget target)
+        internal void ValidateTarget(OperationTarget target)
         {
             var currentWindow = FindWindow(target.WindowHandle);
             // Excel can return a different Window COM identity for the same HWND.
@@ -205,9 +205,63 @@ namespace Sheaside.Services
             if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
             target.Window.Activate();
             ValidateTarget(target);
+            var visibility = target.Sheet.Visible;
+            bool temporarilyShow = visibility == Excel.XlSheetVisibility.xlSheetVeryHidden;
+            bool screenUpdating = application.ScreenUpdating;
+            object previousActive = target.Window.ActiveSheet;
+            try
+            {
+                if (temporarilyShow)
+                {
+                    application.ScreenUpdating = false;
+                    target.Sheet.Visible = Excel.XlSheetVisibility.xlSheetVisible;
+                }
+                return CopyWorksheet(target, visibility);
+            }
+            finally
+            {
+                if (temporarilyShow)
+                {
+                    try
+                    {
+                        target.Sheet.Visible = visibility;
+                        var activeWindow = application.ActiveWindow;
+                        if (activeWindow != null && activeWindow.Hwnd == target.WindowHandle)
+                        {
+                            var worksheet = previousActive as Excel.Worksheet;
+                            var chart = previousActive as Excel.Chart;
+                            if (worksheet != null) worksheet.Activate();
+                            else if (chart != null) chart.Activate();
+                        }
+                    }
+                    finally { application.ScreenUpdating = screenUpdating; }
+                }
+            }
+        }
+
+        private string CopyWorksheet(OperationTarget target, Excel.XlSheetVisibility visibility)
+        {
+            ValidateTarget(target);
+            var before = new HashSet<string>(GetWorksheets(target.Workbook).Select(i => i.Id));
+            string sourceId = GetWorksheetId(target.Sheet);
             target.Sheet.CopyAfter();
-            var copy = target.Sheet.Next;
-            return GetWorksheetId(copy);
+            var after = GetWorksheets(target.Workbook).ToArray();
+            var added = after.Where(i => !before.Contains(i.Id)).ToArray();
+            if (added.Length != 1 || added[0].Kind != target.Sheet.Kind)
+                throw new InvalidOperationException("複製先を一意に確認できません。実際の一覧を確認してください。");
+            string copyId = added[0].Id;
+            var copy = CaptureTarget(target.WindowHandle, copyId);
+            if (!Equals(copy.Workbook, target.Workbook)) throw new InvalidOperationException("複製先のブックが変わりました。");
+            int sourceIndex = Array.FindIndex(after, i => i.Id == sourceId);
+            int copyIndex = Array.FindIndex(after, i => i.Id == copyId);
+            if (sourceIndex < 0) throw new InvalidOperationException("複製中に元シートが削除されました。");
+            // Excel can ignore an After anchor when it is hidden. Do not infer
+            // identity from Next; normalize the identified copy's actual tab order.
+            if (copyIndex != sourceIndex + 1)
+                MoveWorksheet(CaptureMove(target.WindowHandle, copyId, after.Select(i => i.Id).ToArray()), sourceIndex + 1);
+            ValidateTarget(copy);
+            if (copy.Sheet.Visible != visibility) copy.Sheet.Visible = visibility;
+            return copyId;
         }
 
         public int? GetTabColor(object nativeSheet)
@@ -238,6 +292,15 @@ namespace Sheaside.Services
                 throw new InvalidOperationException("最後の表示シートは非表示にできません。");
             target.Sheet.Visible = expected == WorksheetVisibility.Visible
                 ? Excel.XlSheetVisibility.xlSheetHidden : Excel.XlSheetVisibility.xlSheetVisible;
+        }
+
+        public void HideWorksheet(OperationTarget target)
+        {
+            ValidateTarget(target);
+            if (target.Sheet == null) throw new InvalidOperationException("シートを選択してください。");
+            if (target.Sheet.Visible == Excel.XlSheetVisibility.xlSheetVisible && CountVisibleSheets(target.Workbook) <= 1)
+                throw new InvalidOperationException("最後の表示シートは非表示にできません。");
+            target.Sheet.Visible = Excel.XlSheetVisibility.xlSheetHidden;
         }
 
         private static int CountVisibleSheets(Excel.Workbook workbook)

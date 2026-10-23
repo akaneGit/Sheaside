@@ -17,6 +17,7 @@ namespace Sheaside.Controls
         private readonly SheetSelectionState selection = new SheetSelectionState();
         private readonly ContextMenuStrip sheetMenu;
         private WorksheetItem menuTarget;
+        private string[] batchMenuTargets = new string[0];
         private bool updating;
 
         public SheetListControl()
@@ -56,6 +57,18 @@ namespace Sheaside.Controls
             colors.DropDownItems.Add("色を選択…", null, (sender, args) => RequestCommand(WorksheetCommand.SetTabColor, menuTarget));
             colors.DropDownItems.Add("色なし", null, (sender, args) => RequestCommand(WorksheetCommand.ClearTabColor, menuTarget));
             sheetMenu.Items.Add(colors);
+            var batchMenu = new ToolStripMenuItem("選択シートの一括操作");
+            foreach (var command in new[] { SheetBatchCommand.Delete, SheetBatchCommand.Hide, SheetBatchCommand.Unhide,
+                SheetBatchCommand.SetColor, SheetBatchCommand.ClearColor, SheetBatchCommand.Duplicate })
+            {
+                var captured = command;
+                batchMenu.DropDownItems.Add(BatchCommandName(command), null, (sender, args) =>
+                {
+                    if (!updating && !IsDragging && batchMenuTargets.Length > 1)
+                        BatchCommandRequested?.Invoke(this, new SheetBatchEventArgs(captured, batchMenuTargets));
+                });
+            }
+            sheetMenu.Items.Add(batchMenu);
             sheetMenu.Opening += (sender, args) =>
             {
                 menuTarget = sheetList.SelectedItem as WorksheetItem;
@@ -65,6 +78,10 @@ namespace Sheaside.Controls
                 hide.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.Visible;
                 unhide.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.Hidden;
                 reveal.Enabled = single && menuTarget?.Visibility == WorksheetVisibility.VeryHidden;
+                batchMenuTargets = SelectedSheetIds;
+                batchMenu.Visible = batchMenuTargets.Length > 1;
+                batchMenu.Enabled = batchMenuTargets.Length > 1;
+                batchMenu.Text = "選択した " + batchMenuTargets.Length + "件を一括操作";
             };
             sheetList.MouseDown += (sender, args) =>
             {
@@ -85,6 +102,19 @@ namespace Sheaside.Controls
 
         public event EventHandler<WorksheetRequestedEventArgs> WorksheetRequested;
         public event EventHandler<WorksheetCommandEventArgs> CommandRequested;
+        public event EventHandler<SheetBatchEventArgs> BatchCommandRequested;
+        internal static string BatchCommandName(SheetBatchCommand command)
+        {
+            switch (command)
+            {
+                case SheetBatchCommand.Delete: return "一括削除…";
+                case SheetBatchCommand.Hide: return "一括非表示…";
+                case SheetBatchCommand.Unhide: return "一括再表示";
+                case SheetBatchCommand.SetColor: return "一括タブ色変更…";
+                case SheetBatchCommand.ClearColor: return "一括で色なし";
+                default: return "一括複製";
+            }
+        }
         public bool IsMenuOpen { get { return sheetMenu.Visible; } }
         public bool IsDragging { get { return sheetList.IsDragging; } }
         public event EventHandler<WorksheetDragStartingEventArgs> DragStarting
@@ -124,7 +154,7 @@ namespace Sheaside.Controls
         private void UpdateSelectionSummary()
         {
             int count = sheetList.SelectedItems.Count;
-            selectionLabel.Text = count + "件選択中" + (count > 1 ? "（操作は1件選択時）" : "");
+            selectionLabel.Text = count + "件選択中" + (count > 1 ? "（右クリックで一括操作）" : "");
             addButton.Enabled = count <= 1;
         }
 

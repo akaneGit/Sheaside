@@ -74,7 +74,7 @@ internal static partial class SmokeTests
             Check(view.SelectedSheetIds.OrderBy(i => i).SequenceEqual(selected), "right click selected row preserves set");
             typeof(ContextMenuStrip).GetMethod("OnOpening", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                 .Invoke(list.ContextMenuStrip, new object[] { new System.ComponentModel.CancelEventArgs() });
-            Check(list.ContextMenuStrip.Items.Cast<ToolStripItem>().All(item => !item.Enabled), "multi selection disables single-sheet menus");
+            Check(list.ContextMenuStrip.Items.Cast<ToolStripItem>().Take(8).All(item => !item.Enabled), "multi selection disables single-sheet menus");
             Check(!view.Controls.OfType<Button>().Single().Enabled, "multi selection disables add button");
             int starts = 0;
             view.DragStarting += (s, e) => starts++;
@@ -214,6 +214,19 @@ internal static partial class SmokeTests
                 var activeBefore = book.Windows[1].ActiveSheet;
                 InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
                 Check(book.Windows[1].SelectedSheets.Count == 1 && Equals(activeBefore, book.Windows[1].ActiveSheet), "local selection never groups Excel sheets");
+                // Verify deletion/recreation before creating the second window:
+                // Excel 2013 can reject Chart.Delete after multi-window activity.
+                sheet.Activate();
+                chart.Delete();
+                view.ShowWorksheets(book.Name, service.GetWorksheets(book), id);
+                Check(view.SelectedSheetIds.SequenceEqual(new[] { id }), "Excel deletion prunes selected chart");
+                var replacement = (Excel.Chart)book.Charts.Add();
+                replacement.Name = "ChartRenamed";
+                Check(service.GetWorksheetId(replacement) != chartId, "recreated same name does not inherit deleted selection");
+                chart = replacement;
+                chartId = service.GetWorksheetId(chart);
+                view.ShowWorksheets(book.Name, service.GetWorksheets(book), service.GetActiveWorksheetId(book.Windows[1]));
+                InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
                 var second = book.NewWindow();
                 secondView.ShowWorksheets(book.Name, service.GetWorksheets(book), service.GetActiveWorksheetId(second));
                 Check(secondView.SelectedSheetIds.Length == 1 && view.SelectedSheetIds.Length == 2, "same book windows keep independent sets");
@@ -224,19 +237,6 @@ internal static partial class SmokeTests
                 var sameName = (Excel.Worksheet)other.Worksheets[1];
                 sameName.Name = sheet.Name;
                 Check(service.GetWorksheetId(sameName) != id, "same name in other book has independent identity");
-                second.Activate();
-                sheet.Activate();
-                for (int i = 1; i <= book.Windows.Count; i++)
-                {
-                    book.Windows[i].Activate();
-                    sheet.Activate();
-                }
-                chart.Delete();
-                view.ShowWorksheets(book.Name, service.GetWorksheets(book), id);
-                Check(view.SelectedSheetIds.SequenceEqual(new[] { id }), "Excel deletion prunes selected chart");
-                var replacement = (Excel.Chart)book.Charts.Add();
-                replacement.Name = "ChartRenamed";
-                Check(service.GetWorksheetId(replacement) != chartId, "recreated same name does not inherit deleted selection");
             }
             service.ClearIdentities();
         }

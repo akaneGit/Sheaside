@@ -20,6 +20,7 @@ namespace Sheaside.Services
             public SheetListControl View;
             public EventHandler<WorksheetRequestedEventArgs> WorksheetHandler;
             public EventHandler<WorksheetCommandEventArgs> CommandHandler;
+            public EventHandler<SheetBatchEventArgs> BatchHandler;
             public string PreferredSelection;
             public EventHandler<WorksheetDragStartingEventArgs> DragStartingHandler;
             public EventHandler<WorksheetDropEventArgs> DropHandler;
@@ -29,6 +30,7 @@ namespace Sheaside.Services
         private readonly Excel.Application application;
         private readonly CustomTaskPaneCollection taskPanes;
         private readonly ExcelWorksheetService worksheets;
+        private readonly ExcelSheetBatchService batches;
         private readonly Dictionary<int, PaneEntry> entries = new Dictionary<int, PaneEntry>();
         private readonly Timer refreshTimer;
         private bool refreshing;
@@ -45,6 +47,7 @@ namespace Sheaside.Services
             this.application = application;
             this.taskPanes = taskPanes;
             worksheets = new ExcelWorksheetService(application);
+            batches = new ExcelSheetBatchService(worksheets);
             // Events handle activation immediately; a conditional UI-thread timer
             // covers changes without dedicated events (visibility, tab color, close).
             refreshTimer = new Timer { Interval = 3000 };
@@ -189,6 +192,8 @@ namespace Sheaside.Services
                 view.WorksheetRequested += entry.WorksheetHandler;
                 entry.CommandHandler = (sender, args) => ExecuteCommand(handle, entry, args);
                 view.CommandRequested += entry.CommandHandler;
+                entry.BatchHandler = (sender, args) => ExecuteBatch(handle, entry, args);
+                view.BatchCommandRequested += entry.BatchHandler;
                 entry.DragStartingHandler = (sender, args) => StartDrag(handle, entry, args);
                 entry.DropHandler = (sender, args) => DropSheet(entry, args);
                 entry.DragCompletedHandler = (sender, args) => FinishDrag(entry);
@@ -313,6 +318,58 @@ namespace Sheaside.Services
             }
         }
 
+        private void ExecuteBatch(int handle, PaneEntry entry, SheetBatchEventArgs args)
+        {
+            if (disposed || operating || draggingEntry != null) return;
+            operating = true;
+            SheetBatchResult result = null;
+            try
+            {
+                var plan = batches.Capture(handle, args.Ids, args.Command);
+                string title = SheetListControl.BatchCommandName(args.Command);
+                int? color = null;
+                if (args.Command == SheetBatchCommand.SetColor)
+                {
+                    using (var dialog = new ColorDialog { FullOpen = true })
+                    {
+                        if (plan.Items[0].TabColor.HasValue) dialog.Color = System.Drawing.ColorTranslator.FromOle(plan.Items[0].TabColor.Value);
+                        if (dialog.ShowDialog(entry.View) != DialogResult.OK) return;
+                        color = System.Drawing.ColorTranslator.ToOle(dialog.Color);
+                    }
+                }
+                bool confirmed = false;
+                if (plan.NeedsConfirmation)
+                {
+                    string message = "対象 " + plan.Items.Count + "件：" + title + "を実行しますか？\r\n";
+                    message += args.Command == SheetBatchCommand.Delete ? "削除は元に戻せません。" :
+                        args.Command == SheetBatchCommand.Hide ? "VeryHiddenもHiddenに変更します。" : "VeryHiddenの対象も再表示します。";
+                    using (var dialog = new BatchDetailsDialog(title, message,
+                        string.Join("\r\n", plan.Items.Select(i => i.DisplayName)), true))
+                        confirmed = dialog.ShowDialog(entry.View) == DialogResult.OK;
+                    if (!confirmed) return;
+                }
+                result = batches.Execute(plan, confirmed, color);
+            }
+            catch (Exception exception) when (IsOperationError(exception))
+            {
+                MessageBox.Show(entry.View, OperationErrorMessage(exception), "Sheaside — 一括操作", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            finally
+            {
+                operating = false;
+                Refresh(); // Actual Excel state, including partial success; prune deleted IDs.
+            }
+            if (result == null || entry.View.IsDisposed) return;
+            entry.View.ShowStatus(result.Summary);
+            operating = true;
+            try
+            {
+                using (var dialog = new BatchDetailsDialog("一括操作の結果", result.Summary, result.Details, false))
+                    dialog.ShowDialog(entry.View);
+            }
+            finally { operating = false; Refresh(); }
+        }
+
         private void StartDrag(int handle, PaneEntry entry, WorksheetDragStartingEventArgs args)
         {
             if (disposed || operating || draggingEntry != null) return;
@@ -402,6 +459,7 @@ namespace Sheaside.Services
             }
             entry.View.WorksheetRequested -= entry.WorksheetHandler;
             entry.View.CommandRequested -= entry.CommandHandler;
+            entry.View.BatchCommandRequested -= entry.BatchHandler;
             DetachDragHandlers(entry);
             entry.View.Dispose();
             entries.Remove(handle);
@@ -426,6 +484,7 @@ namespace Sheaside.Services
                 entry.Pane.VisibleChanged -= OnVisibleChanged;
                 entry.View.WorksheetRequested -= entry.WorksheetHandler;
                 entry.View.CommandRequested -= entry.CommandHandler;
+                entry.View.BatchCommandRequested -= entry.BatchHandler;
                 DetachDragHandlers(entry);
             }
             entries.Clear();

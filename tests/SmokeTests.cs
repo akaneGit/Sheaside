@@ -18,16 +18,24 @@ internal static partial class SmokeTests
     {
         try
         {
-            TestNames();
-            TestList();
-            TestRenameDialog();
-            TestReorderRules();
-            TestDragControl();
-            TestAppearance();
-            TestChartList();
-            TestMultiSelection();
-            TestPointerRegression();
-            if (args.Contains("--excel")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); TestExcelSelection(); }
+            if (!args.Contains("--batch-only"))
+            {
+                TestNames();
+                TestList();
+                TestRenameDialog();
+                TestReorderRules();
+                TestDragControl();
+                TestAppearance();
+                TestChartList();
+                TestMultiSelection();
+                TestPointerRegression();
+            }
+            TestBatch();
+            if (args.Contains("--excel"))
+            {
+                if (!args.Contains("--batch-only")) { TestExcel(); TestExcelReorder(); TestExcelAppearance(); TestExcelCharts(); TestExcelSelection(); }
+                TestExcelBatch();
+            }
             Console.WriteLine("PASS: " + assertions + " assertions" + (args.Contains("--excel") ? " (including Excel integration)" : " (managed only)"));
             return 0;
         }

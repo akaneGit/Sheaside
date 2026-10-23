@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$Excel)
+param([switch]$Excel, [switch]$BatchOnly)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
@@ -16,8 +16,13 @@ $sources = @(
     'tests/AppearanceTests.cs',
     'tests/ChartTests.cs',
     'tests/SelectionTests.cs',
+    'tests/BatchTests.cs',
     'Sheaside/Models/WorksheetItem.cs',
     'Sheaside/Models/SheetSelectionState.cs',
+    'Sheaside/Models/SheetBatch.cs',
+    'Sheaside/Services/SheetBatchRunner.cs',
+    'Sheaside/Services/ExcelSheetBatchService.cs',
+    'Sheaside/Controls/BatchDetailsDialog.cs',
     'Sheaside/Models/WorksheetDragEventArgs.cs',
     'Sheaside/Controls/ReorderableSheetListBox.cs',
     'Sheaside/Services/WorksheetMoveRules.cs',
@@ -30,5 +35,8 @@ $sources = @(
 $executable = Join-Path $output 'SmokeTests.exe'
 & $compiler /nologo /target:exe /debug:full /langversion:7.3 "/out:$executable" "/link:$interop" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:Microsoft.CSharp.dll @sources
 if ($LASTEXITCODE -ne 0) { throw 'Smoke test compilation failed.' }
-if ($Excel) { & $executable --excel } else { & $executable }
+$testArguments = @()
+if ($Excel) { $testArguments += '--excel' }
+if ($BatchOnly) { $testArguments += '--batch-only' }
+& $executable @testArguments
 if ($LASTEXITCODE -ne 0) { throw 'Smoke tests failed.' }

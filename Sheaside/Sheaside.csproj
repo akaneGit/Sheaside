@@ -210,6 +210,10 @@
     </Compile>
     <Compile Include="Models\WorksheetItem.cs" />
     <Compile Include="Models\SheetSelectionState.cs" />
+    <Compile Include="Models\SheetBatch.cs" />
+    <Compile Include="Services\SheetBatchRunner.cs" />
+    <Compile Include="Services\ExcelSheetBatchService.cs" />
+    <Compile Include="Controls\BatchDetailsDialog.cs" />
     <Compile Include="Models\WorksheetDragEventArgs.cs" />
     <Compile Include="Controls\ReorderableSheetListBox.cs" />
     <Compile Include="Services\WorksheetMoveRules.cs" />
