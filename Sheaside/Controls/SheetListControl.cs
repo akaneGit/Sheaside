@@ -8,7 +8,7 @@ using Sheaside.Services;
 
 namespace Sheaside.Controls
 {
-    internal sealed class SheetListControl : UserControl
+    internal sealed class SheetListControl : UserControl, IMessageFilter
     {
         private readonly Label workbookLabel;
         private readonly ReorderableSheetListBox sheetList;
@@ -30,6 +30,8 @@ namespace Sheaside.Controls
         private readonly Button filterButton;
         private readonly Label filterSummary;
         private readonly Panel filterPopup;
+        internal Button ClearFilterButton { get; private set; }
+        private bool popupFilterInstalled;
         internal bool HasFacetFilter { get { return visibilityFilter != 0 || kindFilter != 0; } }
         internal Panel FilterPopup { get { return filterPopup; } }
         private bool changingFilter;
@@ -143,7 +145,7 @@ namespace Sheaside.Controls
             filterButton.Click += (s, e) => ToggleFilterPopup();
             searchRow.Controls.Add(searchBox); searchRow.Controls.Add(filterButton);
             filterSummary = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
-            var clear = new Button { Text = "解除", Dock = DockStyle.Right, Width = 48, AccessibleName = "状態・種類フィルターを解除" };
+            var clear = ClearFilterButton = new Button { Text = "解除", Dock = DockStyle.Right, Width = 48, Visible = false, AccessibleName = "状態・種類フィルターを解除" };
             clear.Click += (s, e) => SetFilter(searchBox.Text, null, null);
             var summaryRow = new Panel { Dock = DockStyle.Fill };
             summaryRow.Controls.Add(filterSummary); summaryRow.Controls.Add(clear);
@@ -151,6 +153,11 @@ namespace Sheaside.Controls
             searchBox.TextChanged += (s, e) => RefreshFilter();
             Controls.Add(filters);
             filterPopup = new Panel { Visible = false, BorderStyle = BorderStyle.FixedSingle, AutoScroll = true };
+            filterPopup.VisibleChanged += (s, e) =>
+            {
+                if (filterPopup.Visible && !popupFilterInstalled) { Application.AddMessageFilter(this); popupFilterInstalled = true; }
+                else if (!filterPopup.Visible && popupFilterInstalled) { Application.RemoveMessageFilter(this); popupFilterInstalled = false; }
+            };
             Controls.Add(filterPopup);
             SizeChanged += (s, e) => PositionFilterPopup();
             Controls.Add(header);
@@ -192,9 +199,6 @@ namespace Sheaside.Controls
                 button.Click += (s, e) => { kindFilter = value; filterPopup.Visible = false; RefreshFilter(); };
                 contents.Controls.Add(button);
             }
-            var clear = new Button { Text = "フィルター解除", Width = 170, Height = 28 };
-            clear.Click += (s, e) => { filterPopup.Visible = false; SetFilter(searchBox.Text, null, null); };
-            contents.Controls.Add(clear);
             filterPopup.Controls.Add(contents);
             ApplyTheme();
             PositionFilterPopup(); filterPopup.Visible = true; filterPopup.BringToFront();
@@ -205,6 +209,19 @@ namespace Sheaside.Controls
             int top = Math.Min(PointToClient(filterButton.PointToScreen(new Point(0, filterButton.Height))).Y, Math.Max(0, ClientSize.Height - 80));
             filterPopup.SetBounds(Math.Max(0, ClientSize.Width - 204), top, Math.Max(1, Math.Min(200, ClientSize.Width)), Math.Max(1, Math.Min(320, ClientSize.Height - top)));
         }
+        internal void CloseFilterPopup() { if (filterPopup != null) filterPopup.Visible = false; }
+        internal void HandlePopupPointer(Point screenPoint)
+        {
+            if (filterPopup.Visible && !filterPopup.RectangleToScreen(filterPopup.ClientRectangle).Contains(screenPoint) &&
+                !filterButton.RectangleToScreen(filterButton.ClientRectangle).Contains(screenPoint)) CloseFilterPopup();
+        }
+        public bool PreFilterMessage(ref Message message)
+        {
+            if (message.Msg == 0x201 || message.Msg == 0x204 || message.Msg == 0x207 || message.Msg == 0xA1 || message.Msg == 0xA4)
+                HandlePopupPointer(Cursor.Position);
+            if (message.Msg == 0x1C && message.WParam == IntPtr.Zero) CloseFilterPopup();
+            return false;
+        }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Escape && filterPopup.Visible) { filterPopup.Visible = false; return true; }
@@ -213,6 +230,7 @@ namespace Sheaside.Controls
         private void RefreshFilter()
         {
             if (changingFilter) return;
+            ClearFilterButton.Visible = HasFacetFilter;
             filterSummary.Text = (visibilityFilter == 0 ? "状態:すべて" : new[] { "", "表示", "非表示", "VeryHidden" }[visibilityFilter]) + " / " + (kindFilter == 0 ? "種類:すべて" : kindFilter == 1 ? "ワークシート" : "グラフシート");
             filterButton.Invalidate();
             CancelDrag();
@@ -397,7 +415,7 @@ namespace Sheaside.Controls
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { preferences.Changed -= OnPreferencesChanged; sheetMenu.Dispose(); }
+            if (disposing) { CloseFilterPopup(); if (popupFilterInstalled) Application.RemoveMessageFilter(this); preferences.Changed -= OnPreferencesChanged; sheetMenu.Dispose(); }
             base.Dispose(disposing);
         }
 

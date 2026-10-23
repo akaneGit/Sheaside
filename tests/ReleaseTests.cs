@@ -126,7 +126,17 @@ internal static partial class SmokeTests
             options.Single(b => b.Text.Contains("非表示")).PerformClick();
             Check(view.HasFacetFilter && list.Items.Count == 1, "popup applies state while preserving query");
             view.ToggleFilterPopup();
-            view.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().Single(b => b.Text == "フィルター解除").PerformClick();
+            Check(view.ClearFilterButton.Visible && !view.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().Any(b => b.Text == "フィルター解除"), "only external facet reset exists");
+            view.HandlePopupPointer(view.PointToScreen(new System.Drawing.Point(-10, -10)));
+            Check(!view.FilterPopup.Visible && view.HasFacetFilter, "outside click closes without resetting facets");
+            view.ToggleFilterPopup(); view.ToggleFilterPopup();
+            Check(!view.FilterPopup.Visible, "filter toggle closes popup");
+            view.ToggleFilterPopup();
+            var escape = Message.Create(IntPtr.Zero, 0x100, (IntPtr)Keys.Escape, IntPtr.Zero);
+            typeof(SheetListControl).GetMethod("ProcessCmdKey", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(view, new object[] { escape, Keys.Escape });
+            Check(!view.FilterPopup.Visible && view.HasFacetFilter, "escape closes popup and retains facets");
+            view.ClearFilterButton.PerformClick();
+            Check(!view.ClearFilterButton.Visible, "reset hidden when facets cleared");
             Check(!view.HasFacetFilter && list.Items.Count == 2 && view.IsFiltered, "one-click facet reset keeps search");
             settings.SetShowVeryHidden(true);
             view.SetFilter("", WorksheetVisibility.VeryHidden, null);
