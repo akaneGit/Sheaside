@@ -40,16 +40,20 @@ internal static partial class SmokeTests
             InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
             var menu = list.ContextMenuStrip;
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(menu, new object[] { new CancelEventArgs() });
-            var batch = (ToolStripMenuItem)menu.Items[3];
-            Check(batch.Enabled && menu.Items.Count == 8, "unified menu has no batch submenu");
+            var batch = (ToolStripMenuItem)menu.Items[1];
+            Check(batch.Enabled && menu.Items.Count == 11, "unified menu has no batch submenu");
+            Check(menu.Items[2] is ToolStripSeparator && menu.Items[5] is ToolStripSeparator && menu.Items[9] is ToolStripSeparator && menu.Items[1].Text == "シートの削除…", "rc2 menu order and separators");
             SheetBatchEventArgs request = null;
             view.BatchCommandRequested += (s, e) => request = e;
+            view.DeleteButton.PerformClick();
+            Check(request != null && request.Ids.Count == 4 && request.Command == SheetBatchCommand.Delete, "toolbar deletes selected set through batch command");
             list.ClearSelected();
+            Check(!view.DeleteButton.Enabled, "delete toolbar disabled with no target");
             batch.PerformClick();
             Check(request != null && request.Command == SheetBatchCommand.Delete && request.Ids.SequenceEqual(items.Select(i => i.Id)), "batch menu captures immutable target IDs");
             InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Escape));
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(menu, new object[] { new CancelEventArgs() });
-            Check(batch.Enabled && menu.Items[1].Enabled, "single selection uses same delete menu");
+            Check(batch.Enabled && menu.Items[3].Enabled, "single selection uses same delete menu");
         }
     }
 

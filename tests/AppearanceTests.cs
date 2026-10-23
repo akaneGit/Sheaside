@@ -31,13 +31,13 @@ internal static partial class SmokeTests
             var menu = list.ContextMenuStrip;
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(menu, new object[] { new CancelEventArgs() });
-            Check(menu.Items[4].Enabled && menu.Items[5].Enabled && !menu.Items[6].Enabled, "VeryHidden can hide or reveal via unified menu");
+            Check(menu.Items[6].Enabled && menu.Items[7].Enabled && !menu.Items[8].Enabled, "VeryHidden can hide or reveal via unified menu");
             rows[20] = new WorksheetItem("s20", "Sheet 20", WorksheetVisibility.Hidden, null);
             view.ShowWorksheets("Book", rows, "s0");
             Check(((WorksheetItem)list.Items[20]).DisplayName.Contains("非表示"), "Hidden label distinct");
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(menu, new object[] { new CancelEventArgs() });
-            Check(!menu.Items[4].Enabled && menu.Items[5].Enabled && menu.Items[6].Enabled, "Hidden can reveal or become VeryHidden");
+            Check(!menu.Items[6].Enabled && menu.Items[7].Enabled && menu.Items[8].Enabled, "Hidden can reveal or become VeryHidden");
             using (var bitmap = new Bitmap(260, 400))
             using (var graphics = Graphics.FromImage(bitmap))
             {

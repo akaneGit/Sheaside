@@ -97,7 +97,7 @@ internal static partial class SmokeTests
             Check(activationRequests == 0, "refresh does not activate Excel sheets");
             WorksheetCommandEventArgs command = null;
             view.CommandRequested += (sender, e) => command = e;
-            view.Controls.OfType<Button>().Single().PerformClick();
+            view.AddButton.PerformClick();
             Check(command != null && command.Command == WorksheetCommand.Add && command.Worksheet.Id == "Sheet2", "add button uses current row");
             typeof(ListBox).GetMethod("OnMouseDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(list, new object[] { new MouseEventArgs(MouseButtons.Left, 2, 4, 4, 0) });
@@ -108,11 +108,11 @@ internal static partial class SmokeTests
             list.SelectedIndex = -1;
             SheetBatchEventArgs batch = null;
             view.BatchCommandRequested += (s, e) => batch = e;
-            menu.Items[3].PerformClick();
+            menu.Items[1].PerformClick();
             Check(batch != null && batch.Command == SheetBatchCommand.Delete && batch.Ids.Single() == "Sheet2", "menu command retains opening target");
             typeof(ContextMenuStrip).GetMethod("OnOpening", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(menu, new object[] { new System.ComponentModel.CancelEventArgs() });
-            Check(menu.Items[0].Enabled && !menu.Items[1].Enabled && !menu.Items[2].Enabled && !menu.Items[3].Enabled, "empty space allows only add");
+            Check(menu.Items[0].Enabled && !menu.Items[3].Enabled && !menu.Items[4].Enabled && !menu.Items[1].Enabled, "empty space allows only add");
         }
     }
 

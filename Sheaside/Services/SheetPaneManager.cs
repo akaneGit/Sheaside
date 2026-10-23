@@ -246,11 +246,9 @@ namespace Sheaside.Services
                 {
                     case WorksheetCommand.Hide:
                         worksheets.ChangeVisibility(target, WorksheetVisibility.Visible);
-                        status = "シートを非表示にしました。";
                         break;
                     case WorksheetCommand.Unhide:
                         worksheets.ChangeVisibility(target, WorksheetVisibility.Hidden);
-                        status = "シートを再表示しました。";
                         break;
                     case WorksheetCommand.RevealVeryHidden:
                         string revealName = target.Sheet.Name;
@@ -259,7 +257,6 @@ namespace Sheaside.Services
                             MessageBoxDefaultButton.Button2) == DialogResult.Yes)
                         {
                             worksheets.ChangeVisibility(target, WorksheetVisibility.VeryHidden, revealName);
-                            status = "VeryHiddenのシートを再表示しました。";
                         }
                         break;
                     case WorksheetCommand.SetTabColor:
@@ -270,17 +267,14 @@ namespace Sheaside.Services
                             if (dialog.ShowDialog(entry.View) == DialogResult.OK)
                             {
                                 worksheets.SetTabColor(target, System.Drawing.ColorTranslator.ToOle(dialog.Color));
-                                status = "タブの色を変更しました。";
                             }
                         }
                         break;
                     case WorksheetCommand.ClearTabColor:
                         worksheets.SetTabColor(target, null);
-                        status = "タブの色を「色なし」にしました。";
                         break;
                     case WorksheetCommand.Add:
                         entry.PreferredSelection = worksheets.AddWorksheet(target);
-                        status = "シートを追加しました。";
                         break;
                     case WorksheetCommand.Rename:
                         using (var dialog = new RenameSheetDialog(target.Sheet.Name, newName =>
@@ -292,13 +286,11 @@ namespace Sheaside.Services
                             if (dialog.ShowDialog(entry.View) == DialogResult.OK)
                             {
                                 entry.PreferredSelection = worksheets.GetWorksheetId(target.Sheet);
-                                status = "シート名を変更しました。";
                             }
                         }
                         break;
                     case WorksheetCommand.Duplicate:
                         entry.PreferredSelection = worksheets.DuplicateWorksheet(target);
-                        status = "元シートの直後に複製しました。";
                         break;
                     case WorksheetCommand.Delete:
                         worksheets.EnsureCanDelete(target);
@@ -308,7 +300,6 @@ namespace Sheaside.Services
                             MessageBoxDefaultButton.Button2) == DialogResult.Yes)
                         {
                             worksheets.DeleteWorksheet(target, name);
-                            status = "シート「" + name + "」を削除しました。";
                         }
                         break;
                 }
@@ -322,7 +313,7 @@ namespace Sheaside.Services
             {
                 operating = false;
                 Refresh();
-                if (!entry.View.IsDisposed && status != null) entry.View.ShowStatus(status);
+
             }
         }
 
@@ -370,7 +361,7 @@ namespace Sheaside.Services
                 Refresh(); // Actual Excel state, including partial success; prune deleted IDs.
             }
             if (result == null || entry.View.IsDisposed || (result.Error == null && result.Count(SheetBatchStatus.Failed) == 0)) return;
-            entry.View.ShowStatus(result.Summary);
+
             operating = true;
             try
             {
@@ -415,7 +406,7 @@ namespace Sheaside.Services
             {
                 bool moved = worksheets.MoveWorksheet(moveSession, args.Boundary);
                 entry.PreferredSelection = worksheets.GetWorksheetId(moveSession.Target.Sheet);
-                dragStatus = moved ? "シートを並び替えました。" : null;
+                dragStatus = null;
             }
             catch (Exception exception) when (IsOperationError(exception))
             {

@@ -80,8 +80,8 @@ internal static partial class SmokeTests
             Check(view.SelectedSheetIds.OrderBy(i => i).SequenceEqual(selected), "right click selected row preserves set");
             typeof(ContextMenuStrip).GetMethod("OnOpening", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                 .Invoke(list.ContextMenuStrip, new object[] { new System.ComponentModel.CancelEventArgs() });
-            Check(!list.ContextMenuStrip.Items[0].Enabled && !list.ContextMenuStrip.Items[1].Enabled && list.ContextMenuStrip.Items[3].Enabled, "multi selection disables add rename and enables common delete");
-            Check(!view.Controls.OfType<Button>().Single().Enabled, "multi selection disables add button");
+            Check(!list.ContextMenuStrip.Items[0].Enabled && !list.ContextMenuStrip.Items[3].Enabled && list.ContextMenuStrip.Items[1].Enabled, "multi selection disables add rename and enables common delete");
+            Check(!view.AddButton.Enabled, "multi selection disables add button");
             int starts = 0;
             view.DragStarting += (s, e) => starts++;
             InvokeControl(list, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 8, 8, 0));

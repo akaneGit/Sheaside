@@ -119,11 +119,11 @@ namespace Sheaside.Services
                 if (GetWorksheetId(sheet) != codeName) continue;
                 if (sheet.Visible != Excel.XlSheetVisibility.xlSheetVisible)
                     return sheet.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden
-                        ? "VeryHiddenのシートです。右クリックの「VeryHiddenを再表示…」で確認して再表示できます。"
+                        ? "VeryHiddenのシートです。右クリックの「再表示」から表示できます。"
                         : "非表示のシートです。右クリックの「再表示」から表示できます。";
                 window.Activate();
                 sheet.Activate();
-                return "シート「" + sheet.Name + "」に切り替えました。";
+                return null;
             }
             return "シートが見つかりません。一覧の更新後に選び直してください。";
         }

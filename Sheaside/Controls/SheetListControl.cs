@@ -12,9 +12,11 @@ namespace Sheaside.Controls
     {
         private readonly Label workbookLabel;
         private readonly ReorderableSheetListBox sheetList;
-        private readonly Label statusLabel;
         private readonly Label selectionLabel;
         private readonly Button addButton;
+        private readonly Button deleteButton;
+        internal Button AddButton { get { return addButton; } }
+        internal Button DeleteButton { get { return deleteButton; } }
         private readonly SheetSelectionState selection = new SheetSelectionState();
         private readonly ContextMenuStrip sheetMenu;
         private WorksheetItem menuTarget;
@@ -37,7 +39,6 @@ namespace Sheaside.Controls
             Font = new Font("Yu Gothic UI", 9F);
             Padding = new Padding(8);
             workbookLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
-            statusLabel = new Label { Dock = DockStyle.Bottom, Height = 44, AutoEllipsis = true };
             selectionLabel = new Label { Dock = DockStyle.Bottom, Height = 26, AutoEllipsis = true };
             sheetList = new ReorderableSheetListBox
             {
@@ -59,8 +60,8 @@ namespace Sheaside.Controls
             sheetMenu = new ContextMenuStrip();
             sheetMenu.Items.Add("シートの追加", null, (sender, args) => RequestCommand(WorksheetCommand.Add, menuTarget));
             sheetMenu.Items.Add("名前の変更", null, (sender, args) => RequestCommand(WorksheetCommand.Rename, menuTarget));
-            sheetMenu.Items.Add("複製", null, (sender, args) => RequestBatch(SheetBatchCommand.Duplicate));
-            sheetMenu.Items.Add("削除…", null, (sender, args) => RequestBatch(SheetBatchCommand.Delete));
+            sheetMenu.Items.Add("シートの複製", null, (sender, args) => RequestBatch(SheetBatchCommand.Duplicate));
+            sheetMenu.Items.Add("シートの削除…", null, (sender, args) => RequestBatch(SheetBatchCommand.Delete));
             var hide = sheetMenu.Items.Add("非表示にする", null, (sender, args) => RequestBatch(SheetBatchCommand.Hide));
             var unhide = sheetMenu.Items.Add("再表示", null, (sender, args) => RequestBatch(SheetBatchCommand.Unhide));
             var reveal = sheetMenu.Items.Add("VeryHiddenにする", null, (sender, args) => RequestBatch(SheetBatchCommand.VeryHide));
@@ -68,13 +69,18 @@ namespace Sheaside.Controls
             colors.DropDownItems.Add("色を選択…", null, (sender, args) => RequestBatch(SheetBatchCommand.SetColor));
             colors.DropDownItems.Add("色なし", null, (sender, args) => RequestBatch(SheetBatchCommand.ClearColor));
             sheetMenu.Items.Add(colors);
+            var add = sheetMenu.Items[0]; var rename = sheetMenu.Items[1];
+            var duplicate = sheetMenu.Items[2]; var delete = sheetMenu.Items[3];
+            sheetMenu.Items.Clear();
+            sheetMenu.Items.AddRange(new ToolStripItem[] { add, delete, new ToolStripSeparator(), rename, duplicate,
+                new ToolStripSeparator(), hide, unhide, reveal, new ToolStripSeparator(), colors });
             sheetMenu.Opening += (sender, args) =>
             {
                 menuTarget = sheetList.SelectedItem as WorksheetItem;
                 bool single = sheetList.SelectedItems.Count == 1;
                 sheetMenu.Items[0].Enabled = sheetList.SelectedItems.Count <= 1;
                 for (int i = 1; i < sheetMenu.Items.Count; i++) sheetMenu.Items[i].Enabled = sheetList.SelectedItems.Count > 0;
-                sheetMenu.Items[1].Enabled = single;
+                rename.Enabled = single;
                 var selected = sheetList.SelectedItems.Cast<WorksheetItem>().ToArray();
                 hide.Enabled = selected.Any(i => i.Visibility != WorksheetVisibility.Hidden);
                 unhide.Enabled = selected.Any(i => !i.IsVisible);
@@ -89,13 +95,22 @@ namespace Sheaside.Controls
                 CaptureSelection();
             };
             sheetList.ContextMenuStrip = sheetMenu;
-            addButton = new Button { Text = "+ シートを追加", Dock = DockStyle.Top, Height = 32, AccessibleName = "シートを追加" };
+            addButton = new Button { Text = "＋ 追加", Dock = DockStyle.Fill, AccessibleName = "シートを追加" };
             addButton.Click += (sender, args) => RequestCommand(WorksheetCommand.Add, sheetList.SelectedItem as WorksheetItem);
+            deleteButton = new Button { Text = "削除", Dock = DockStyle.Fill, AccessibleName = "選択シートを削除", Enabled = false };
+            deleteButton.Click += (s, e) =>
+            {
+                batchMenuTargets = SelectedSheetIds;
+                RequestBatch(SheetBatchCommand.Delete);
+            };
+            var actions = new TableLayoutPanel { Dock = DockStyle.Top, Height = 34, ColumnCount = 2, RowCount = 1 };
+            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            actions.Controls.Add(addButton, 0, 0); actions.Controls.Add(deleteButton, 1, 0);
             sheetList.SelectedIndexChanged += (sender, args) => { if (!updating) CaptureSelection(); };
             Controls.Add(sheetList);
             Controls.Add(selectionLabel);
-            Controls.Add(statusLabel);
-            Controls.Add(addButton);
+            Controls.Add(actions);
             var header = new Panel { Dock = DockStyle.Top, Height = 32 };
             var settingsButton = new Button { Text = "設定", Dock = DockStyle.Right, Width = 54, AccessibleName = "Sheasideの設定" };
             header.Controls.Add(workbookLabel); header.Controls.Add(settingsButton);
@@ -150,7 +165,6 @@ namespace Sheaside.Controls
             if (changingFilter) return;
             CancelDrag();
             sheetMenu.Close(); batchMenuTargets = new string[0];
-            statusLabel.Text = "";
             ShowWorksheets(snapshotBook, snapshot, snapshotActive);
         }
 
@@ -244,6 +258,7 @@ namespace Sheaside.Controls
             int count = sheetList.SelectedItems.Count;
             selectionLabel.Text = count + "件選択中 / " + sheetList.Items.Count + "件表示";
             addButton.Enabled = count <= 1;
+            deleteButton.Enabled = count > 0;
         }
 
         private void ApplySelection()
@@ -297,8 +312,6 @@ namespace Sheaside.Controls
                 ApplySelection();
                 if (sheetList.Items.Count > 0)
                     sheetList.TopIndex = Math.Min(Math.Max(0, topIndex), sheetList.Items.Count - 1);
-                if (changed || statusLabel.Text.Length == 0)
-                    statusLabel.Text = worksheets.Count == 0 ? "表示条件に一致するシートがありません。" : IsFiltered ? "絞り込み中は並び替えできません。" : "クリック、または選択して Enter で切り替えます。";
             }
             finally
             {
@@ -307,7 +320,8 @@ namespace Sheaside.Controls
             }
         }
 
-        public void ShowStatus(string message) { statusLabel.Text = message; }
+        public void ShowStatus(string message)
+        { if (!string.IsNullOrEmpty(message)) MessageBox.Show(this, message, "Sheaside", MessageBoxButtons.OK, MessageBoxIcon.Information); }
 
         private static bool SameItem(WorksheetItem left, WorksheetItem right)
         {
