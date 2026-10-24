@@ -44,7 +44,7 @@ namespace Sheaside.Controls
                 Dock = DockStyle.Fill,
                 IntegralHeight = false,
                 HorizontalScrollbar = true,
-                DisplayMember = "DisplayName",
+                DisplayMember = "AccessibleDescription",
                 AccessibleName = "シート一覧"
             };
             // MouseClick also handles clicking an already selected row (e.g. after a failed activation).

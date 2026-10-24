@@ -26,6 +26,7 @@ namespace Sheaside.Models
         // OLE RGB value; null is different from black (0).
         public int? TabColor { get; private set; }
         public bool IsVisible { get { return Visibility == WorksheetVisibility.Visible; } }
+        public string AccessibleDescription { get { return Name + " — " + (Kind == SheetKind.Chart ? "グラフシート" : "ワークシート") + " / " + Visibility; } }
         public string DisplayName { get { return (Kind == SheetKind.Chart ? "［グラフ］" : "") + Name + (IsVisible ? "" : (Visibility == WorksheetVisibility.VeryHidden ? "（VeryHidden）" : "（非表示）")); } }
     }
 

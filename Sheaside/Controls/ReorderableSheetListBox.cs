@@ -12,6 +12,10 @@ namespace Sheaside.Controls
     {
         private const string DragFormat = "Sheaside.LocalWorksheetMove";
         private readonly Timer scrollTimer;
+        private readonly ToolTip rowTooltip = new ToolTip();
+        private string tooltipText;
+        internal static LineIcon KindIcon(WorksheetItem item) { return item.Kind == SheetKind.Chart ? LineIcon.Chart : LineIcon.Worksheet; }
+        internal static LineIcon StateIcon(WorksheetItem item) { return item.Visibility == WorksheetVisibility.Hidden ? LineIcon.Hidden : item.Visibility == WorksheetVisibility.VeryHidden ? LineIcon.Locked : LineIcon.None; }
         private Point mouseDownPoint;
         private WorksheetItem mouseDownItem;
         private string dragToken;
@@ -63,7 +67,7 @@ namespace Sheaside.Controls
         public void UpdateTextExtent()
         {
             HorizontalExtent = Items.Cast<WorksheetItem>().Select(item =>
-                TextRenderer.MeasureText("● " + item.DisplayName, Font).Width + 28).DefaultIfEmpty(0).Max();
+                TextRenderer.MeasureText(item.Name, Font).Width + (int)(80 * DeviceDpi / 96F)).DefaultIfEmpty(0).Max();
         }
 
         protected override void OnFontChanged(EventArgs e)
@@ -86,9 +90,16 @@ namespace Sheaside.Controls
                 e.Graphics.FillRectangle(brush, swatch);
             using (var pen = new Pen(selected ? SystemColors.HighlightText : ForeColor))
                 e.Graphics.DrawRectangle(pen, swatch);
-            string caption = (item.Id == activeWorksheetId ? "● " : "　 ") + item.DisplayName;
-            var bounds = new Rectangle(e.Bounds.Left + 22, e.Bounds.Top, Math.Max(0, e.Bounds.Width - 22), e.Bounds.Height);
-            TextRenderer.DrawText(e.Graphics, caption, Font, bounds, text,
+            int unit = Math.Max(16, (int)Math.Round(16 * e.Graphics.DpiX / 96F));
+            int left = e.Bounds.Left + 22;
+            TextRenderer.DrawText(e.Graphics, item.Id == activeWorksheetId ? "●" : "", Font, new Rectangle(left, e.Bounds.Top, unit, e.Bounds.Height), text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            left += unit;
+            ModernButton.DrawIcon(e.Graphics, KindIcon(item), new Rectangle(left, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), text);
+            left += unit + 4;
+            if (StateIcon(item) != LineIcon.None) ModernButton.DrawIcon(e.Graphics, StateIcon(item), new Rectangle(left, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), text);
+            left += unit + 4;
+            var bounds = new Rectangle(left, e.Bounds.Top, Math.Max(0, e.Bounds.Right - left), e.Bounds.Height);
+            TextRenderer.DrawText(e.Graphics, item.Name, Font, bounds, text,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
             e.DrawFocusRectangle();
         }
@@ -134,6 +145,9 @@ namespace Sheaside.Controls
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            int hover = IndexFromPoint(e.Location);
+            string description = hover >= 0 ? ((WorksheetItem)Items[hover]).AccessibleDescription : "";
+            if (description != tooltipText) { tooltipText = description; rowTooltip.SetToolTip(this, IsDragging ? "" : description); }
             if (pointerTracking && blockDragGesture && OutsideDragThreshold(e.Location)) consumedClick = true;
             if (!ReorderEnabled || e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging || SelectedItems.Count > 1) return;
             if (!OutsideDragThreshold(e.Location)) return;
@@ -391,7 +405,7 @@ namespace Sheaside.Controls
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { CancelDrag(); scrollTimer.Dispose(); }
+            if (disposing) { CancelDrag(); scrollTimer.Dispose(); rowTooltip.Dispose(); }
             base.Dispose(disposing);
         }
     }

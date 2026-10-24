@@ -13,6 +13,14 @@ internal static partial class SmokeTests
 {
     private static void TestAppearance()
     {
+        foreach (SheetKind kind in Enum.GetValues(typeof(SheetKind)))
+            foreach (WorksheetVisibility state in Enum.GetValues(typeof(WorksheetVisibility)))
+            {
+                var row = new WorksheetItem("icon", "名前", state, null, kind);
+                Check(ReorderableSheetListBox.KindIcon(row) == (kind == SheetKind.Chart ? LineIcon.Chart : LineIcon.Worksheet), "sheet kind icon " + kind + state);
+                Check(ReorderableSheetListBox.StateIcon(row) == (state == WorksheetVisibility.Visible ? LineIcon.None : state == WorksheetVisibility.Hidden ? LineIcon.Hidden : LineIcon.Locked), "state icon " + kind + state);
+                Check(row.AccessibleDescription.Contains(state.ToString()) && row.AccessibleDescription.Contains(kind == SheetKind.Chart ? "グラフ" : "ワーク"), "accessible row description " + kind + state);
+            }
         foreach (int size in new[] { 16, 32, 256 })
             using (var logo = RibbonArtwork.Create(size))
                 Check(logo.Width == size && logo.Height == size && logo.GetPixel(0, 0).A == 0 && logo.GetPixel(size / 2, size / 2).A > 0, "brand icon size/transparency " + size);
