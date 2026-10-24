@@ -13,7 +13,7 @@ public static class SheasideUiProbe {
 }
 "@
 }
-$probeExcel=$null; $probeBook=$null; $checks=0
+$probeExcel=$null; $probeBook=$null; $otherBook=$null; $checks=0
 $prefPath=Join-Path $env:LOCALAPPDATA 'Sheaside/settings.xml'
 $prefExists=Test-Path -LiteralPath $prefPath
 $prefBytes=if($prefExists){[IO.File]::ReadAllBytes($prefPath)}else{$null}
@@ -25,8 +25,9 @@ function Elements {
 function Named($name) { Elements | Where-Object { $_.Current.Name -eq $name -and -not $_.Current.IsOffscreen } | Select-Object -First 1 }
 function PaneButtons { Elements | Where-Object { $_.Current.ClassName -like 'WindowsForms10.BUTTON*' -and -not $_.Current.IsOffscreen } }
 function Select-View { $tab=Elements | Where-Object { $_.Current.Name -eq '表示' -and $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::TabItem } | Select-Object -First 1; $tab.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); Start-Sleep -Milliseconds 200 }
-function Toggle($name) { (Named $name).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle(); Start-Sleep -Milliseconds 500 }
-function Is-On($name) { (Named $name).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On }
+function RibbonButton($name) { Elements | Where-Object { $_.Current.Name -eq $name -and $_.Current.ClassName -eq 'NetUIRibbonButton' } | Select-Object -First 1 }
+function Toggle($name) { (RibbonButton $name).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle(); Start-Sleep -Milliseconds 500 }
+function Is-On($name) { (RibbonButton $name).GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On }
 function Set-Toggle($name,$value) { if((Is-On $name) -ne $value){Toggle $name} }
 function Click-Button($button) {
  $result=[IntPtr]::Zero
@@ -50,6 +51,8 @@ try {
  $delete=PaneButtons | Where-Object {$_.Current.Name -eq '削除'} | Select-Object -First 1
  Assert ($add -and $delete -and $add.Current.BoundingRectangle.Height -eq $delete.Current.BoundingRectangle.Height) 'ribbon opens aligned panel actions'
  Assert (@(PaneButtons).Count -eq 2) 'obsolete filter and settings controls absent'
+ Assert (@(Elements | Where-Object {$_.Current.Name -eq 'シート一覧' -and $_.Current.ClassName -eq 'MsoWorkPane'}).Count -eq 1) 'task pane title is sheet list'
+ Assert (@(Elements | Where-Object {$_.Current.ClassName -like 'WindowsForms10.STATIC*' -and ($_.Current.Name -eq 'Sheaside' -or $_.Current.Name -eq $probeBook.Name)}).Count -eq 0) 'panel has no duplicated title or workbook label'
  Set-Toggle '非表示も表示' $false; Set-Toggle 'VeryHiddenも表示' $false
  Assert ([bool](Named '1件選択中 / 1件表示')) 'default visible-only rows'
  Toggle '非表示も表示'
@@ -82,8 +85,18 @@ try {
  Assert (-not (Is-On 'シート一覧') -and @(PaneButtons).Count -eq 0) 'second window starts hidden independently'
  $first.Activate(); Select-View
  Assert ((Is-On 'シート一覧') -and @(PaneButtons).Count -eq 2) 'return to first window preserves open pane'
+ $otherBook=$probeExcel.Workbooks.Add(-4167)
+ Select-View
+ Assert (-not (Is-On 'シート一覧') -and @(PaneButtons).Count -eq 0) 'different workbook starts with independent hidden pane'
+ Toggle 'シート一覧'
+ Assert ([bool](Named '1件選択中 / 1件表示')) 'different workbook displays own sheet list'
+ Click-Button (PaneButtons | Where-Object {$_.Current.Name -eq '追加'} | Select-Object -First 1)
+ Assert ($otherBook.Sheets.Count -eq 2 -and $probeBook.Sheets.Count -eq 3) 'add routes to current workbook only'
+ $first.Activate(); Select-View
+ Assert ((Is-On 'シート一覧') -and [bool](Named '1件選択中 / 3件表示')) 'return to original workbook restores original list'
  Write-Output "PASS: $checks Excel $($probeExcel.Version) host UI checks"
 } finally {
+ if($otherBook){$otherBook.Close($false)}
  if($probeBook){$probeBook.Close($false)}
  if($probeExcel){$probeExcel.Quit(); [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($probeExcel)}
  if($prefExists){[IO.File]::WriteAllBytes($prefPath,$prefBytes)}elseif(Test-Path -LiteralPath $prefPath){Remove-Item -LiteralPath $prefPath}

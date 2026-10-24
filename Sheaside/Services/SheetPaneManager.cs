@@ -194,7 +194,7 @@ namespace Sheaside.Services
             CustomTaskPane pane = null;
             try
             {
-                pane = taskPanes.Add(view, "Sheaside", window);
+                pane = taskPanes.Add(view, "シート一覧", window);
                 pane.DockPosition = Office.MsoCTPDockPosition.msoCTPDockPositionRight;
                 pane.Width = 300;
                 pane.Visible = false;

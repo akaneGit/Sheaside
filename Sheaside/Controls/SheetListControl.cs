@@ -10,7 +10,6 @@ namespace Sheaside.Controls
 {
     internal sealed class SheetListControl : UserControl
     {
-        private readonly Label workbookLabel;
         private readonly ReorderableSheetListBox sheetList;
         private readonly Label selectionLabel;
         private readonly Button addButton;
@@ -37,7 +36,6 @@ namespace Sheaside.Controls
             Size = new Size(260, 500);
             Font = new Font("Yu Gothic UI", 9F);
             Padding = new Padding(8);
-            workbookLabel = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft };
             selectionLabel = new Label { Dock = DockStyle.Bottom, Height = 26, AutoEllipsis = true };
             sheetList = new ReorderableSheetListBox
             {
@@ -110,8 +108,6 @@ namespace Sheaside.Controls
             Controls.Add(sheetList);
             Controls.Add(selectionLabel);
             Controls.Add(actions);
-            var bookRow = new Panel { Dock = DockStyle.Top, Height = 26 };
-            bookRow.Controls.Add(workbookLabel);
             searchBox = new TextBox { Dock = DockStyle.Fill, AccessibleName = "シート名を部分一致検索" };
             ClearSearchButton = new ModernButton { Text = "解除", Dock = DockStyle.Right, Width = 48, Visible = false, AccessibleName = "検索を解除" };
             ClearSearchButton.Click += (s, e) => SetSearch("");
@@ -120,8 +116,7 @@ namespace Sheaside.Controls
             searchIcon.Paint += (s, e) => { int size = (int)Math.Round(16 * e.Graphics.DpiX / 96F); ModernButton.DrawIcon(e.Graphics, LineIcon.Search, new Rectangle(2, (searchIcon.Height - size) / 2, size, size), searchIcon.ForeColor); };
             searchRow.Controls.Add(searchBox); searchRow.Controls.Add(searchIcon); searchRow.Controls.Add(ClearSearchButton);
             searchBox.TextChanged += (s, e) => RefreshSearch();
-            Controls.Add(searchRow); Controls.Add(bookRow);
-            Controls.Add(new Label { Text = "Sheaside", Dock = DockStyle.Top, Height = 28, TextAlign = ContentAlignment.MiddleLeft });
+            Controls.Add(searchRow);
             preferences.Changed += OnPreferencesChanged;
             ApplyTheme();
         }
@@ -244,7 +239,6 @@ namespace Sheaside.Controls
             worksheets = worksheets.Where(i => i.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
             IsFiltered = query.Length > 0 || worksheets.Count != snapshot.Count;
             sheetList.ReorderEnabled = true;
-            workbookLabel.Text = workbookName;
             CaptureSelection();
             selection.Reconcile(worksheets.Select(item => item.Id), activeId, preferredId);
 

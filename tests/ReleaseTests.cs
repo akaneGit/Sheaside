@@ -100,6 +100,12 @@ internal static partial class SmokeTests
             first.SetOfficeTheme(OfficeTheme.System);
             Check(list.BackColor == System.Drawing.SystemColors.Window && list.ForeColor == System.Drawing.SystemColors.WindowText, "system theme restores system colors");
             first.Size = new System.Drawing.Size(220, 400); first.PerformLayout();
+            var searchRow = first.Controls.OfType<Panel>().Single(p => p.Controls.OfType<TextBox>().Any());
+            var actions = first.Controls.OfType<TableLayoutPanel>().Single();
+            Check(searchRow.Top == first.Padding.Top && actions.Top == searchRow.Bottom && list.Top == actions.Bottom,
+                "search starts at top with no title or workbook gaps");
+            Check(first.Controls.OfType<Label>().Count() == 1 && list.Height == first.ClientSize.Height - first.Padding.Vertical - searchRow.Height - actions.Height - first.Controls.OfType<Label>().Single().Height,
+                "removed header space belongs to list, only count label remains");
             Check(list.Width > 150 && list.Height > 80, "compact pane keeps usable list area");
             first.Size = new System.Drawing.Size(500, 700); first.PerformLayout();
             Check(list.Width > 400 && list.Height > 300, "list expands with pane size");
