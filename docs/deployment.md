@@ -5,7 +5,7 @@ Excelのシートを縦一覧で管理するWindows向けVSTOアドインです�
 ## ダウンロードと前提条件
 
 公開先: https://github.com/akaneGit/Sheaside/releases/tag/v1.0.0-rc.5
-リポジトリは非公開のため、閲覧権限のあるGitHubアカウントでログインしてください。
+公開リポジトリのため、閲覧・ダウンロードにリポジトリへの個別アクセス権は不要です。
 
 - WindowsのデスクトップExcel（導入予定: Microsoft 365）。Web版Excelは対象外。
 - [.NET Framework 4.8以上](https://learn.microsoft.com/en-us/dotnet/framework/install/on-windows-10)。MSIはRelease値528040以上を確認します。

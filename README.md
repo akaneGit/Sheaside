@@ -46,7 +46,7 @@ Visual Studio 2026 Community、Office/SharePoint開発ツール、.NET Framework
 
 ```
 
-RC5の検証結果は[開発記録](docs/rc.5-progress.md)を参照してください。今回の対象はExcel 2013上の非表示シート選択・色パレット・一覧描画の改善です。rc.5のMSI・配布ZIPを作成しました。[GitHubプレリリース](https://github.com/akaneGit/Sheaside/releases/tag/v1.0.0-rc.5)から取得できます（非公開リポジトリのアクセス権が必要）。[導入手順](docs/deployment.md)・[配布検証記録](docs/rc.5-distribution.md)・[Microsoft 365確認リスト](docs/rc.5-install-checklist.md)を参照してください。Microsoft 365への実インストール・更新は未検証です。
+RC5の検証結果は[開発記録](docs/rc.5-progress.md)を参照してください。今回の対象はExcel 2013上の非表示シート選択・色パレット・一覧描画の改善です。rc.5のMSI・配布ZIPを作成しました。[GitHubプレリリース](https://github.com/akaneGit/Sheaside/releases/tag/v1.0.0-rc.5)から取得できます。[導入手順](docs/deployment.md)・[配布検証記録](docs/rc.5-distribution.md)・[Microsoft 365確認リスト](docs/rc.5-install-checklist.md)を参照してください。Microsoft 365への実インストール・更新は未検証です。
 
 自動テストは専用ブック・独立したExcel 2013（15.0）インスタンスを使用します。一部の既知の削除拒否は、対象保持・警告設定復元を検証する分岐を含みます。Microsoft 365での成功を代用しません。ホスト内UIの検証範囲・結果は開発記録に記載しています。実マウス操作・実OS倍率・別PCへのインストールは手動確認が必要です。
 
