@@ -220,6 +220,7 @@
     <Compile Include="Models\TabColorChoice.cs" />
     <Compile Include="Controls\ColorPaletteDialog.cs" />
     <Compile Include="Controls\ModernButton.cs" />
+    <Compile Include="Controls\RibbonArtwork.cs" />
     <Compile Include="Services\SheetBatchRunner.cs" />
     <Compile Include="Services\UserPreferences.cs" />
     <Compile Include="Services\OfficeThemeReader.cs" />

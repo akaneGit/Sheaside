@@ -13,6 +13,9 @@ internal static partial class SmokeTests
 {
     private static void TestAppearance()
     {
+        foreach (int size in new[] { 16, 32, 256 })
+            using (var logo = RibbonArtwork.Create(size))
+                Check(logo.Width == size && logo.Height == size && logo.GetPixel(0, 0).A == 0 && logo.GetPixel(size / 2, size / 2).A > 0, "brand icon size/transparency " + size);
         var palette = TabColorChoice.Palette(TabColorChoice.DefaultTheme(), true);
         Check(palette.Count == 60 && palette.All(c => c.Theme.HasValue), "theme palette has sixty linked colors");
         Check(palette[0].Theme == 2 && palette[1].Theme == 1 && palette[4].Theme == 5, "Excel palette theme order");

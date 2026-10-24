@@ -4,13 +4,13 @@
     <tabs>
       <tab idMso="TabView">
         <group id="SheasideGroup" label="Sheaside">
-          <toggleButton id="SheasideToggle" label="シート一覧" size="large"
+          <toggleButton id="SheasideToggle" label="シート一覧" size="large" getImage="GetBrandImage"
                         getPressed="GetPressed" getEnabled="GetEnabled" onAction="OnToggle"
                         screentip="Sheasideの表示・非表示"
                         supertip="現在のExcelウィンドウのシート一覧を表示・非表示にします。" />
-          <toggleButton id="SheasideHidden" label="非表示も表示" getPressed="GetDisplayPressed" getEnabled="GetEnabled" onAction="OnDisplayToggle"
+          <toggleButton id="SheasideHidden" label="非表示も表示" getImage="GetStateImage" getPressed="GetDisplayPressed" getEnabled="GetEnabled" onAction="OnDisplayToggle"
                         screentip="Hiddenシートを一覧に含める" supertip="非表示のシートをSheasideの一覧に表示します。Excelのシート自体は再表示しません。" />
-          <toggleButton id="SheasideVeryHidden" label="VeryHiddenも表示" getPressed="GetDisplayPressed" getEnabled="GetEnabled" onAction="OnDisplayToggle"
+          <toggleButton id="SheasideVeryHidden" label="VeryHiddenも表示" getImage="GetStateImage" getPressed="GetDisplayPressed" getEnabled="GetEnabled" onAction="OnDisplayToggle"
                         screentip="VeryHiddenシートを一覧に含める" supertip="通常の再表示に出ないシートを一覧に含めます。非表示も表示とは独立した設定です。" />
         </group>
       </tab>

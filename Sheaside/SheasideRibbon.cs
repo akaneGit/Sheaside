@@ -9,6 +9,26 @@ namespace Sheaside
     public sealed class SheasideRibbon : Office.IRibbonExtensibility
     {
         private Office.IRibbonUI ribbon;
+        private readonly object brandImage = PictureConverter.Convert(Controls.RibbonArtwork.Create(32));
+        public object GetBrandImage(Office.IRibbonControl control) { return brandImage; }
+        public object GetStateImage(Office.IRibbonControl control)
+        {
+            var theme = Services.OfficeTheme.System;
+            try { theme = Services.OfficeThemeReader.Read(Globals.ThisAddIn.Application.Version); }
+            catch (COMException) { }
+            using (var image = new System.Drawing.Bitmap(16, 16))
+            {
+                using (var graphics = System.Drawing.Graphics.FromImage(image))
+                    Controls.ModernButton.DrawIcon(graphics, control.Id == "SheasideHidden" ? Controls.LineIcon.Hidden : Controls.LineIcon.Locked,
+                        new System.Drawing.Rectangle(0, 0, 16, 16), Controls.UiAppearance.Foreground(theme));
+                return PictureConverter.Convert(image);
+            }
+        }
+        private sealed class PictureConverter : System.Windows.Forms.AxHost
+        {
+            private PictureConverter() : base("") { }
+            internal static object Convert(System.Drawing.Image image) { return GetIPictureDispFromPicture(image); }
+        }
 
         public string GetCustomUI(string ribbonID)
         {
