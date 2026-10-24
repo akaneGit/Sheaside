@@ -51,6 +51,11 @@ internal static partial class SmokeTests
                 service.GetWorksheetId(sheet), service.GetWorksheets(book).Select(i => i.Id).ToArray());
             Check(order() == "Data,Sales,Tail", "mixed tab order excludes embedded chart: " + order());
             var chartRow = service.GetWorksheets(book)[1];
+            Check(!chartRow.IsProtected, "new chart is unprotected");
+            chart.Protect(Password: "shield");
+            Check(service.GetWorksheets(book)[1].IsProtected, "chart protection snapshot");
+            chart.Unprotect("shield");
+            Check(!service.GetWorksheets(book)[1].IsProtected, "chart unprotect refresh");
             Check(chartRow.Kind == SheetKind.Chart && chartRow.Id.StartsWith("chart:"), "chart metadata and typed identity");
             service.ActivateWorksheet(handle, chartRow.Id);
             Check(Equals(book.Windows[1].ActiveSheet, chart) && service.GetActiveWorksheetId(book.Windows[1]) == chartRow.Id, "chart activation and active identity");

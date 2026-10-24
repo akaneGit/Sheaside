@@ -281,7 +281,7 @@ namespace Sheaside.Controls
 
         private static bool SameItem(WorksheetItem left, WorksheetItem right)
         {
-            return left.Id == right.Id && left.Name == right.Name && left.Kind == right.Kind && left.Visibility == right.Visibility && left.TabColor == right.TabColor;
+            return left.Id == right.Id && left.Name == right.Name && left.Kind == right.Kind && left.Visibility == right.Visibility && left.TabColor == right.TabColor && left.IsProtected == right.IsProtected;
         }
 
         private void RequestCommand(WorksheetCommand command, WorksheetItem worksheet)

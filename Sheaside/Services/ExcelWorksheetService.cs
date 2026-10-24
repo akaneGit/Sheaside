@@ -144,7 +144,7 @@ namespace Sheaside.Services
             {
                 var sheet = ExcelSheet.From(worksheets[i]);
                 liveSheets.Add(sheet.Native);
-                result.Add(new WorksheetItem(GetWorksheetId(sheet), sheet.Name, (WorksheetVisibility)(int)sheet.Visible, GetTabColor(sheet), sheet.Kind));
+                result.Add(new WorksheetItem(GetWorksheetId(sheet), sheet.Name, (WorksheetVisibility)(int)sheet.Visible, GetTabColor(sheet), sheet.Kind, sheet.IsProtected));
             }
             Dictionary<object, string> registry;
             if (identities.TryGetValue(workbook, out registry))

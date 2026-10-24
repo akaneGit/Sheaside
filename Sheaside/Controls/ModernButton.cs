@@ -24,7 +24,7 @@ namespace Sheaside.Controls
             foreach (Control child in parent.Controls) Apply(child, theme);
         }
     }
-    internal enum LineIcon { None, Add, Delete, Search, Filter, Settings, Hidden, Locked, Worksheet, Chart }
+    internal enum LineIcon { None, Add, Delete, Search, Filter, Settings, Hidden, Locked, Worksheet, Chart, Shield }
 
     // Original geometric artwork, drawn in a 16-unit coordinate system; no external font/assets.
     internal sealed class ModernButton : Button
@@ -95,6 +95,7 @@ namespace Sheaside.Controls
                 {
                     switch (icon)
                     {
+                        case LineIcon.Shield: g.DrawPolygon(pen, new[] { new Point(8, 1), new Point(14, 3), new Point(13, 10), new Point(8, 15), new Point(3, 10), new Point(2, 3) }); break;
                         case LineIcon.Worksheet: g.DrawRectangle(pen, 2, 2, 12, 12); g.DrawLine(pen, 2, 6, 14, 6); g.DrawLine(pen, 6, 2, 6, 14); break;
                         case LineIcon.Chart: g.DrawRectangle(pen, 2, 8, 3, 6); g.DrawRectangle(pen, 6, 2, 3, 12); g.DrawRectangle(pen, 10, 5, 3, 9); break;
                         case LineIcon.Hidden:

@@ -28,6 +28,9 @@ namespace Sheaside.Services
             set { if (worksheet != null) worksheet.Name = value; else chart.Name = value; }
         }
         public string CodeName { get { return worksheet != null ? worksheet.CodeName : chart.CodeName; } }
+        public bool IsProtected { get { return worksheet != null
+            ? worksheet.ProtectContents || worksheet.ProtectDrawingObjects || worksheet.ProtectScenarios
+            : chart.ProtectContents || chart.ProtectDrawingObjects || chart.ProtectData || chart.ProtectFormatting || chart.ProtectSelection; } }
         public object Parent { get { return worksheet != null ? worksheet.Parent : chart.Parent; } }
         public object Next { get { return worksheet != null ? worksheet.Next : chart.Next; } }
         public Excel.Tab Tab { get { return worksheet != null ? worksheet.Tab : chart.Tab; } }

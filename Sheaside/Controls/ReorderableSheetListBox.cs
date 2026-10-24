@@ -16,6 +16,12 @@ namespace Sheaside.Controls
         private string tooltipText;
         internal static LineIcon KindIcon(WorksheetItem item) { return item.Kind == SheetKind.Chart ? LineIcon.Chart : LineIcon.Worksheet; }
         internal static LineIcon StateIcon(WorksheetItem item) { return item.Visibility == WorksheetVisibility.Hidden ? LineIcon.Hidden : item.Visibility == WorksheetVisibility.VeryHidden ? LineIcon.Locked : LineIcon.None; }
+        internal static LineIcon ProtectionIcon(WorksheetItem item) { return item.IsProtected ? LineIcon.Shield : LineIcon.None; }
+        internal static Color IconColor(Color background, Color foreground, bool selected)
+        {
+            if (SystemInformation.HighContrast || selected) return foreground;
+            return background.GetBrightness() < .5F ? Color.FromArgb(210, 210, 210) : Color.FromArgb(85, 85, 85);
+        }
         private Point mouseDownPoint;
         private WorksheetItem mouseDownItem;
         private string dragToken;
@@ -98,16 +104,18 @@ namespace Sheaside.Controls
             using (var background = new SolidBrush(selected ? SystemColors.Highlight : BackColor))
                 e.Graphics.FillRectangle(background, e.Bounds);
             Color text = selected ? SystemColors.HighlightText : ForeColor;
+            Color iconColor = IconColor(BackColor, text, selected);
             DrawTabColor(e.Graphics, e.Bounds, item.TabColor, selected ? SystemColors.Highlight : BackColor);
             int unit = Math.Max(16, (int)Math.Round(16 * e.Graphics.DpiX / 96F));
             int left = e.Bounds.Left + 22;
             TextRenderer.DrawText(e.Graphics, item.Id == activeWorksheetId ? "●" : "", Font, new Rectangle(left, e.Bounds.Top, unit, e.Bounds.Height), text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             left += unit;
-            ModernButton.DrawIcon(e.Graphics, KindIcon(item), new Rectangle(left, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), text);
+            ModernButton.DrawIcon(e.Graphics, KindIcon(item), new Rectangle(left, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), iconColor);
             left += unit + 4;
-            if (StateIcon(item) != LineIcon.None) ModernButton.DrawIcon(e.Graphics, StateIcon(item), new Rectangle(left, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), text);
-            left += unit + 4;
-            var bounds = new Rectangle(left, e.Bounds.Top, Math.Max(0, e.Bounds.Right - left), e.Bounds.Height);
+            int right = e.Bounds.Right - 4;
+            if (item.IsProtected) { right -= unit; ModernButton.DrawIcon(e.Graphics, ProtectionIcon(item), new Rectangle(right, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), iconColor); right -= 4; }
+            if (StateIcon(item) != LineIcon.None) { right -= unit; ModernButton.DrawIcon(e.Graphics, StateIcon(item), new Rectangle(right, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), iconColor); right -= 4; }
+            var bounds = new Rectangle(left, e.Bounds.Top, Math.Max(0, right - left), e.Bounds.Height);
             TextRenderer.DrawText(e.Graphics, item.Name, Font, bounds, text,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
             e.DrawFocusRectangle();

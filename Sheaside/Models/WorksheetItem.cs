@@ -10,23 +10,26 @@ namespace Sheaside.Models
         public WorksheetItem(string worksheetId, string name, bool isVisible)
             : this(worksheetId, name, isVisible ? WorksheetVisibility.Visible : WorksheetVisibility.Hidden, null) { }
 
-        public WorksheetItem(string worksheetId, string name, WorksheetVisibility visibility, int? tabColor, SheetKind kind = SheetKind.Worksheet)
+        public WorksheetItem(string worksheetId, string name, WorksheetVisibility visibility, int? tabColor, SheetKind kind = SheetKind.Worksheet, bool isProtected = false)
         {
             Id = worksheetId;
             Name = name;
             Visibility = visibility;
             TabColor = tabColor;
             Kind = kind;
+            IsProtected = isProtected;
         }
 
         public string Id { get; private set; }
         public string Name { get; private set; }
         public SheetKind Kind { get; private set; }
+        public bool IsProtected { get; private set; }
         public WorksheetVisibility Visibility { get; private set; }
         // OLE RGB value; null is different from black (0).
         public int? TabColor { get; private set; }
         public bool IsVisible { get { return Visibility == WorksheetVisibility.Visible; } }
-        public string AccessibleDescription { get { return Name + " — " + (Kind == SheetKind.Chart ? "グラフシート" : "ワークシート") + " / " + Visibility; } }
+        public string AccessibleDescription { get { return Name + " — " + (Kind == SheetKind.Chart ? "グラフシート" : "ワークシート") + " / " +
+            (IsVisible ? "表示（Visible）" : Visibility == WorksheetVisibility.Hidden ? "非表示（Hidden）" : "強制非表示（VeryHidden）") + (IsProtected ? " / シート保護あり" : ""); } }
         public string DisplayName { get { return (Kind == SheetKind.Chart ? "［グラフ］" : "") + Name + (IsVisible ? "" : (Visibility == WorksheetVisibility.VeryHidden ? "（VeryHidden）" : "（非表示）")); } }
     }
 

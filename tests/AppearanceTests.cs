@@ -29,6 +29,8 @@ internal static partial class SmokeTests
                 Check(ReorderableSheetListBox.KindIcon(row) == (kind == SheetKind.Chart ? LineIcon.Chart : LineIcon.Worksheet), "sheet kind icon " + kind + state);
                 Check(ReorderableSheetListBox.StateIcon(row) == (state == WorksheetVisibility.Visible ? LineIcon.None : state == WorksheetVisibility.Hidden ? LineIcon.Hidden : LineIcon.Locked), "state icon " + kind + state);
                 Check(row.AccessibleDescription.Contains(state.ToString()) && row.AccessibleDescription.Contains(kind == SheetKind.Chart ? "グラフ" : "ワーク"), "accessible row description " + kind + state);
+                var protectedRow = new WorksheetItem("protected", "名前", state, null, kind, true);
+                Check(ReorderableSheetListBox.ProtectionIcon(protectedRow) == LineIcon.Shield && ReorderableSheetListBox.ProtectionIcon(row) == LineIcon.None && protectedRow.AccessibleDescription.Contains("シート保護あり"), "protection icon independent of kind and visibility");
             }
         foreach (int size in new[] { 16, 32, 256 })
             using (var logo = RibbonArtwork.Create(size))
@@ -113,6 +115,13 @@ internal static partial class SmokeTests
             var second = (Excel.Worksheet)book.Worksheets.Add(After: first);
             int handle = book.Windows[1].Hwnd;
             var target = service.CaptureTarget(handle, service.GetWorksheetId(second));
+            book.Protect(Password: "shield", Structure: true);
+            Check(!service.GetWorksheets(book).Single(i => i.Id == service.GetWorksheetId(second)).IsProtected, "workbook structure protection is not sheet protection");
+            book.Unprotect("shield");
+            second.Protect(Password: "shield");
+            Check(service.GetWorksheets(book).Single(i => i.Id == service.GetWorksheetId(second)).IsProtected, "worksheet protection snapshot");
+            second.Unprotect("shield");
+            Check(!service.GetWorksheets(book).Single(i => i.Id == service.GetWorksheetId(second)).IsProtected, "worksheet unprotect refresh");
             foreach (var color in new[] { Color.Black, Color.Red, Color.FromArgb(12, 45, 210) })
             {
                 int ole = ColorTranslator.ToOle(color);
