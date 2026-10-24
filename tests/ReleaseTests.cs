@@ -105,12 +105,14 @@ internal static partial class SmokeTests
             Check(list.Width > 400 && list.Height > 300, "list expands with pane size");
             Check(first.AddButton is ModernButton && first.DeleteButton is ModernButton && first.AddButton.Height == first.DeleteButton.Height, "action buttons use unified renderer and equal height");
             first.Size = new System.Drawing.Size(300, 520);
-            first.ShowWorksheets("UI preview", new[] { new WorksheetItem("a", "売上", true), new WorksheetItem("b", "集計", WorksheetVisibility.Hidden, 255), new WorksheetItem("c", "グラフ", WorksheetVisibility.Visible, null, SheetKind.Chart) }, "a");
+            settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
+            first.ShowWorksheets("UI preview", new[] { new WorksheetItem("a", "売上", true), new WorksheetItem("b", "月別売上データ_2026年度_集計用の非表示シート", WorksheetVisibility.Hidden, 255, SheetKind.Worksheet, true), new WorksheetItem("c", "グラフ", WorksheetVisibility.Visible, null, SheetKind.Chart), new WorksheetItem("d", "内部集計", WorksheetVisibility.VeryHidden, 0, SheetKind.Worksheet, true) }, "c");
+            list.ClearSelected(); list.SetSelected(0, true);
             first.PerformLayout();
             using (var bitmap = new System.Drawing.Bitmap(first.Width, first.Height))
             {
                 first.DrawToBitmap(bitmap, first.ClientRectangle);
-                bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc4-pane.png"));
+                bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc5-pane.png"));
             }
         }
     }

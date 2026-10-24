@@ -38,7 +38,7 @@ try {
  $probeExcel.Visible=$true
  $probeBook=$probeExcel.Workbooks.Add(-4167)
  $visible=$probeBook.Worksheets.Item(1); $visible.Name='VisibleProbe'
- $hidden=$probeBook.Worksheets.Add(); $hidden.Name='HiddenProbe'; $hidden.Visible=0
+ $hidden=$probeBook.Worksheets.Add(); $hidden.Name='OrdinaryHiddenProbe'; $hidden.Visible=0
  $very=$probeBook.Worksheets.Add(); $very.Name='VeryHiddenProbe'; $very.Visible=2
  $visible.Activate()
  Assert $probeExcel.COMAddIns.Item('Sheaside').Connect 'VSTO connected in Excel'
@@ -61,6 +61,16 @@ try {
  if([SheasideUiProbe]::SendText([IntPtr]$edit.Current.NativeWindowHandle,0xC,[IntPtr]::Zero,'VeryHiddenProbe',2,2000,[ref]$textResult) -eq [IntPtr]::Zero){throw 'Search input timed out'}
  Start-Sleep -Milliseconds 300
  Assert ([bool](Named '解除') -and [bool](Named '0件選択中 / 1件表示')) 'search filters rows and exposes clear'
+ foreach($hiddenName in @('OrdinaryHiddenProbe','VeryHiddenProbe')) {
+  [void][SheasideUiProbe]::SendText([IntPtr]$edit.Current.NativeWindowHandle,0xC,[IntPtr]::Zero,$hiddenName,2,2000,[ref]$textResult)
+  Start-Sleep -Milliseconds 200
+  $list=Elements | Where-Object {$_.Current.ClassName -like 'WindowsForms10.LISTBOX*'} | Select-Object -First 1
+  $clickResult=[IntPtr]::Zero
+  foreach($message in @(0x201,0x202)) {
+   if([SheasideUiProbe]::SendMessageTimeout([IntPtr]$list.Current.NativeWindowHandle,$message,[IntPtr]::Zero,[IntPtr](8 -bor (8 -shl 16)),2,2000,[ref]$clickResult) -eq [IntPtr]::Zero){throw 'Hidden selection blocked by a modal notification'}
+  }
+  Assert ($probeExcel.ActiveSheet.Name -eq 'VisibleProbe' -and [bool](Named '1件選択中 / 1件表示')) "silent local selection without activation: $hiddenName"
+ }
  Click-Button (PaneButtons | Where-Object {$_.Current.Name -eq '解除'} | Select-Object -First 1)
  Assert (-not [bool](Named '解除') -and (Is-On '非表示も表示') -and (Is-On 'VeryHiddenも表示')) 'search clear preserves visibility switches'
  Toggle 'シート一覧'

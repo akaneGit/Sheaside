@@ -78,8 +78,20 @@ internal static partial class SmokeTests
             var standard = layout.Controls.OfType<TableLayoutPanel>().Single(c => c.Name == "StandardGrid");
             Check(standard.Controls.Count == 10 && standard.Controls.Cast<Control>().All(c => c.Width > 10 && c.Height > 10 && standard.ClientRectangle.Contains(c.Bounds)), "standard colors visible with fallback at scale " + scale);
             Check(!layout.VerticalScroll.Visible && !layout.HorizontalScroll.Visible && layout.Controls.Cast<Control>().All(c => layout.ClientRectangle.Contains(c.Bounds)), "complete palette fits without scroll at scale " + scale);
+            if (scale == 1F)
+                using (var preview = new Bitmap(dialog.Width, dialog.Height))
+                {
+                    dialog.DrawToBitmap(preview, new Rectangle(0, 0, dialog.Width, dialog.Height));
+                    preview.Save(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc5-palette.png"));
+                }
             ((Button)standard.GetControlFromPosition(1, 0)).PerformClick();
             Check(dialog.Selection.Rgb == ColorTranslator.ToOle(Color.Red) && !dialog.Selection.Theme.HasValue, "standard red selection independent of theme");
+        }
+        using (var dialog = new ColorPaletteDialog(null))
+        {
+            var none = dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().Single(b => b.Text == "色なし");
+            typeof(Button).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(none, new object[] { EventArgs.Empty });
+            Check(dialog.Selection != null && !dialog.Selection.Rgb.HasValue && !dialog.Selection.Theme.HasValue, "palette no-color returns explicit clearing choice");
         }
         var settings = new UserPreferences(); settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
         using (var view = new SheetListControl(settings) { Size = new Size(260, 400) })
