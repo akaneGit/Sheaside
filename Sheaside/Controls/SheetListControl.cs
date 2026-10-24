@@ -43,7 +43,7 @@ namespace Sheaside.Controls
             {
                 Dock = DockStyle.Fill,
                 IntegralHeight = false,
-                HorizontalScrollbar = true,
+                HorizontalScrollbar = false,
                 DisplayMember = "AccessibleDescription",
                 AccessibleName = "シート一覧"
             };

@@ -13,6 +13,22 @@ internal static partial class SmokeTests
 {
     private static void TestAppearance()
     {
+        foreach (float scale in new[] { 1F, 1.25F, 1.5F })
+        foreach (int width in new[] { 180, 260, 400 })
+        {
+            var bounds = new Rectangle(0, 0, (int)(width * scale), (int)(28 * scale));
+            var layout = ReorderableSheetListBox.LayoutRow(bounds, scale, true, true);
+            Check(layout.Name.Width >= 80 * scale && layout.Kind.Right <= layout.Name.Left && layout.Name.Right <= layout.State.Left && layout.State.Right < layout.Protection.Left && bounds.Contains(layout.Protection), "row slots do not overlap at DPI/width " + scale + "/" + width);
+            Check(layout.Kind.Top == layout.State.Top && layout.State.Top == layout.Protection.Top, "row icons vertically aligned");
+            var row = new WorksheetItem("protected", new string('名', 31), WorksheetVisibility.VeryHidden, 0, SheetKind.Chart, true);
+            Check(ReorderableSheetListBox.DescribeAt(row, bounds, layout.Kind.Location, scale) == "グラフシート" &&
+                ReorderableSheetListBox.DescribeAt(row, bounds, layout.State.Location, scale).Contains("VeryHidden") &&
+                ReorderableSheetListBox.DescribeAt(row, bounds, layout.Protection.Location, scale) == "シート保護あり" &&
+                ReorderableSheetListBox.DescribeAt(row, bounds, layout.Name.Location, scale).Contains(row.Name), "individual tooltips and full name");
+        }
+        Check(SystemInformation.HighContrast || ReorderableSheetListBox.IconColor(Color.White, Color.Black, false) == Color.FromArgb(85, 85, 85), "light theme icons use dark gray");
+        Check(SystemInformation.HighContrast || ReorderableSheetListBox.IconColor(Color.Black, Color.White, false) == Color.FromArgb(210, 210, 210), "dark theme icons use light gray");
+        Check(ReorderableSheetListBox.IconColor(Color.White, SystemColors.HighlightText, true) == SystemColors.HighlightText, "selected icons retain contrast");
         foreach (Color background in new[] { Color.White, Color.FromArgb(32, 32, 32), SystemColors.Highlight })
         foreach (int? color in new int?[] { null, 0, ColorTranslator.ToOle(Color.White), ColorTranslator.ToOle(Color.LightYellow) })
         using (var image = new Bitmap(100, 28))

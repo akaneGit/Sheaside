@@ -22,6 +22,34 @@ namespace Sheaside.Controls
             if (SystemInformation.HighContrast || selected) return foreground;
             return background.GetBrightness() < .5F ? Color.FromArgb(210, 210, 210) : Color.FromArgb(85, 85, 85);
         }
+        internal struct RowLayout
+        {
+            public Rectangle Active, Kind, Name, State, Protection;
+        }
+        internal static RowLayout LayoutRow(Rectangle row, float scale, bool hidden, bool protection)
+        {
+            int unit = Math.Max(1, (int)Math.Round(16 * scale));
+            int gap = Math.Max(1, (int)Math.Round(4 * scale));
+            int y = row.Top + (row.Height - unit) / 2;
+            int left = row.Left + (int)Math.Round(10 * scale);
+            var layout = new RowLayout { Active = new Rectangle(left, row.Top, unit, row.Height) };
+            left += unit;
+            layout.Kind = new Rectangle(left, y, unit, unit);
+            left += unit + gap;
+            int right = row.Right - gap;
+            if (protection) { right -= unit; layout.Protection = new Rectangle(right, y, unit, unit); right -= gap; }
+            if (hidden) { right -= unit; layout.State = new Rectangle(right, y, unit, unit); right -= gap; }
+            layout.Name = new Rectangle(left, row.Top, Math.Max(0, right - left), row.Height);
+            return layout;
+        }
+        internal static string DescribeAt(WorksheetItem item, Rectangle row, Point point, float scale)
+        {
+            var layout = LayoutRow(row, scale, !item.IsVisible, item.IsProtected);
+            if (layout.Kind.Contains(point)) return item.Kind == SheetKind.Chart ? "グラフシート" : "ワークシート";
+            if (layout.State.Contains(point)) return item.Visibility == WorksheetVisibility.Hidden ? "非表示（Hidden）" : "強制非表示（VeryHidden）";
+            if (layout.Protection.Contains(point)) return "シート保護あり";
+            return item.AccessibleDescription;
+        }
         private Point mouseDownPoint;
         private WorksheetItem mouseDownItem;
         private string dragToken;
@@ -54,7 +82,7 @@ namespace Sheaside.Controls
             AllowDrop = true;
             SelectionMode = SelectionMode.MultiExtended;
             DrawMode = DrawMode.OwnerDrawFixed;
-            ItemHeight = Font.Height + 10;
+            ItemHeight = Math.Max(Font.Height + (int)Math.Round(8 * DeviceDpi / 96F), (int)Math.Round(28 * DeviceDpi / 96F));
             scrollTimer = new Timer { Interval = 120 };
             scrollTimer.Tick += ScrollDuringDrag;
         }
@@ -72,14 +100,13 @@ namespace Sheaside.Controls
 
         public void UpdateTextExtent()
         {
-            HorizontalExtent = Items.Cast<WorksheetItem>().Select(item =>
-                TextRenderer.MeasureText(item.Name, Font).Width + (int)(80 * DeviceDpi / 96F)).DefaultIfEmpty(0).Max();
+            HorizontalExtent = 0; // Names use ellipsis; status icons remain inside the viewport.
         }
 
         protected override void OnFontChanged(EventArgs e)
         {
             base.OnFontChanged(e);
-            ItemHeight = Font.Height + 10;
+            ItemHeight = Math.Max(Font.Height + (int)Math.Round(8 * DeviceDpi / 96F), (int)Math.Round(28 * DeviceDpi / 96F));
             UpdateTextExtent();
         }
 
@@ -106,18 +133,13 @@ namespace Sheaside.Controls
             Color text = selected ? SystemColors.HighlightText : ForeColor;
             Color iconColor = IconColor(BackColor, text, selected);
             DrawTabColor(e.Graphics, e.Bounds, item.TabColor, selected ? SystemColors.Highlight : BackColor);
-            int unit = Math.Max(16, (int)Math.Round(16 * e.Graphics.DpiX / 96F));
-            int left = e.Bounds.Left + 22;
-            TextRenderer.DrawText(e.Graphics, item.Id == activeWorksheetId ? "●" : "", Font, new Rectangle(left, e.Bounds.Top, unit, e.Bounds.Height), text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-            left += unit;
-            ModernButton.DrawIcon(e.Graphics, KindIcon(item), new Rectangle(left, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), iconColor);
-            left += unit + 4;
-            int right = e.Bounds.Right - 4;
-            if (item.IsProtected) { right -= unit; ModernButton.DrawIcon(e.Graphics, ProtectionIcon(item), new Rectangle(right, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), iconColor); right -= 4; }
-            if (StateIcon(item) != LineIcon.None) { right -= unit; ModernButton.DrawIcon(e.Graphics, StateIcon(item), new Rectangle(right, e.Bounds.Top + (e.Bounds.Height - unit) / 2, unit, unit), iconColor); right -= 4; }
-            var bounds = new Rectangle(left, e.Bounds.Top, Math.Max(0, right - left), e.Bounds.Height);
-            TextRenderer.DrawText(e.Graphics, item.Name, Font, bounds, text,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+            var layout = LayoutRow(e.Bounds, e.Graphics.DpiX / 96F, StateIcon(item) != LineIcon.None, item.IsProtected);
+            TextRenderer.DrawText(e.Graphics, item.Id == activeWorksheetId ? "●" : "", Font, layout.Active, text, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding);
+            ModernButton.DrawIcon(e.Graphics, KindIcon(item), layout.Kind, iconColor);
+            if (StateIcon(item) != LineIcon.None) ModernButton.DrawIcon(e.Graphics, StateIcon(item), layout.State, iconColor);
+            if (item.IsProtected) ModernButton.DrawIcon(e.Graphics, ProtectionIcon(item), layout.Protection, iconColor);
+            TextRenderer.DrawText(e.Graphics, item.Name, Font, layout.Name, text,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
             e.DrawFocusRectangle();
         }
         public event EventHandler<WorksheetDragStartingEventArgs> DragStarting;
@@ -163,7 +185,7 @@ namespace Sheaside.Controls
         {
             base.OnMouseMove(e);
             int hover = IndexFromPoint(e.Location);
-            string description = hover >= 0 ? ((WorksheetItem)Items[hover]).AccessibleDescription : "";
+            string description = hover >= 0 ? DescribeAt((WorksheetItem)Items[hover], GetItemRectangle(hover), e.Location, DeviceDpi / 96F) : "";
             if (description != tooltipText) { tooltipText = description; rowTooltip.SetToolTip(this, IsDragging ? "" : description); }
             if (pointerTracking && blockDragGesture && OutsideDragThreshold(e.Location)) consumedClick = true;
             if (!ReorderEnabled || e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging) return;
