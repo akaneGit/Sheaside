@@ -103,7 +103,7 @@ internal static partial class SmokeTests
             Check(service.GetTabColor(second) == Convert.ToInt32(second.Tab.Color), "theme resolves actual color");
             service.ChangeVisibility(target, WorksheetVisibility.Visible);
             Check(second.Visible == Excel.XlSheetVisibility.xlSheetHidden, "hide");
-            service.ActivateWorksheet(handle, service.GetWorksheetId(second));
+            Check(service.ActivateWorksheet(handle, service.GetWorksheetId(second)) == null && !Equals(book.Windows[1].ActiveSheet, second), "hidden selection is silent and preserves active sheet");
             Check(second.Visible == Excel.XlSheetVisibility.xlSheetHidden, "click never reveals hidden");
             service.ChangeVisibility(target, WorksheetVisibility.Hidden);
             Check(second.Visible == Excel.XlSheetVisibility.xlSheetVisible, "unhide");
@@ -112,7 +112,7 @@ internal static partial class SmokeTests
             Reject(() => service.ChangeVisibility(target, WorksheetVisibility.Hidden), "stale normal reveal cannot bypass confirmation");
             Reject(() => service.ChangeVisibility(target, WorksheetVisibility.VeryHidden), "VeryHidden requires confirmation name");
             Reject(() => service.ChangeVisibility(target, WorksheetVisibility.VeryHidden, "wrong"), "stale confirmation rejected");
-            service.ActivateWorksheet(handle, service.GetWorksheetId(second));
+            Check(service.ActivateWorksheet(handle, service.GetWorksheetId(second)) == null && !Equals(book.Windows[1].ActiveSheet, second), "hidden selection is silent and preserves active sheet");
             Check(second.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden, "click never reveals VeryHidden");
             service.ChangeVisibility(target, WorksheetVisibility.VeryHidden, second.Name);
             Check(second.Visible == Excel.XlSheetVisibility.xlSheetVisible, "confirmed VeryHidden reveal");

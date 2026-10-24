@@ -184,9 +184,7 @@ namespace Sheaside.Services
                 var sheet = ExcelSheet.From(worksheets[i]);
                 if (GetWorksheetId(sheet) != codeName) continue;
                 if (sheet.Visible != Excel.XlSheetVisibility.xlSheetVisible)
-                    return sheet.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden
-                        ? "VeryHiddenのシートです。右クリックの「再表示」から表示できます。"
-                        : "非表示のシートです。右クリックの「再表示」から表示できます。";
+                    return null; // Local selection only; revealing is an explicit command.
                 window.Activate();
                 sheet.Activate();
                 return null;
