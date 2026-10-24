@@ -51,3 +51,10 @@
 - 既存 `.slnx` Project Id、`.csproj` SubType/CanonicalNameのメタデータ差分は未コミットのまま保持。
 
 操作確認は [rc.4-checklist.md](rc.4-checklist.md) を使用する。
+
+## 既存メタデータ差分の整理（RC4完了後）
+
+ユーザーから確認・修正・コミットの許可を受け、上記の保留差分を採用した。
+`.slnx` のIdは `.csproj` のProjectGuidと一致、ReorderableSheetListBoxのSubTypeはComponent、HostItemのCanonicalNameは生成済みXMLのprimaryCookieとコンストラクターが使用する `AddIn` と一致している。追加のコード修正は不要と判断した。
+`.vscode/settings.json` の `dotnet.preferCSharpExtension: true` も個人情報を含まない開発用設定として追加した。
+採用状態でDebug/Releaseを再ビルドし、いずれも警告0・エラー0。実行コードの変更はなく、RC4で成功済みの回帰テストは再実行していない。
