@@ -60,6 +60,7 @@ namespace Sheaside.Services
         }
 
         public event EventHandler StateChanged;
+        internal UserPreferences Preferences { get { return preferences; } }
 
         public void Start()
         {
@@ -454,6 +455,7 @@ namespace Sheaside.Services
         private void OnPreferencesChanged(object sender, EventArgs e)
         {
             if (disposed) return;
+            StateChanged?.Invoke(this, EventArgs.Empty);
             CancelCurrentDrag("設定が変更されたため、並び替えを中止しました。");
             Refresh();
         }

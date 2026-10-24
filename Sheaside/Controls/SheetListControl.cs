@@ -354,6 +354,7 @@ namespace Sheaside.Controls
             if (IsDragging || sheetList.IsSelecting) return;
             snapshot = worksheets.ToArray(); snapshotBook = workbookName; snapshotActive = activeId;
             worksheets = worksheets.Where(i => preferences.ShowVeryHidden || i.Visibility != WorksheetVisibility.VeryHidden).ToArray();
+            worksheets = worksheets.Where(i => preferences.ShowHidden || i.Visibility != WorksheetVisibility.Hidden).ToArray();
             string query = searchBox.Text;
             int state = visibilityFilter, kind = kindFilter;
             worksheets = worksheets.Where(i => i.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 &&

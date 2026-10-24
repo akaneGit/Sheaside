@@ -30,7 +30,7 @@ internal static partial class SmokeTests
                 .Invoke(grid.GetControlFromPosition(4, 2), new object[] { EventArgs.Empty });
             Check(dialog.Selection.Theme == 5 && dialog.Selection.Tint == .6 && dialog.DialogResult == DialogResult.OK, "palette button selects linked theme tint");
         }
-        var settings = new UserPreferences(); settings.SetShowVeryHidden(true);
+        var settings = new UserPreferences(); settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
         using (var view = new SheetListControl(settings) { Size = new Size(260, 400) })
         {
             var list = view.Controls.OfType<ListBox>().Single();

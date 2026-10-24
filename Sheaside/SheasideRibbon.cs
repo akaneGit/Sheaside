@@ -41,8 +41,26 @@ namespace Sheaside
 
         internal void Invalidate()
         {
-            try { ribbon?.InvalidateControl("SheasideToggle"); }
+            try { ribbon?.Invalidate(); }
             catch (COMException) { /* Office may already be closing its ribbon. */ }
+        }
+        public bool GetDisplayPressed(Office.IRibbonControl control)
+        {
+            var settings = Globals.ThisAddIn.PaneManager?.Preferences;
+            return settings != null && (control.Id == "SheasideHidden" ? settings.ShowHidden : settings.ShowVeryHidden);
+        }
+        public void OnDisplayToggle(Office.IRibbonControl control, bool pressed)
+        {
+            var settings = Globals.ThisAddIn.PaneManager?.Preferences;
+            if (settings == null) return;
+            try
+            {
+                if (control.Id == "SheasideHidden") settings.SetShowHidden(pressed);
+                else if (control.Id == "SheasideVeryHidden") settings.SetShowVeryHidden(pressed);
+            }
+            catch (System.Exception e) when (e is IOException || e is System.UnauthorizedAccessException)
+            { System.Windows.Forms.MessageBox.Show("表示設定を保存できませんでした。\r\n" + e.Message, "Sheaside"); }
+            finally { Invalidate(); }
         }
     }
 }

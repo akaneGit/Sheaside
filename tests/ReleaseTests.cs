@@ -14,6 +14,19 @@ internal static partial class SmokeTests
         try
         {
             var settings = new UserPreferences(path);
+            Check(!settings.ShowHidden && !settings.ShowVeryHidden, "both visibility switches default off");
+            using (var first = new SheetListControl(settings))
+            using (var second = new SheetListControl(settings))
+            {
+                var mixed = new[] { new WorksheetItem("v", "Visible", true), new WorksheetItem("h", "Hidden", WorksheetVisibility.Hidden, null), new WorksheetItem("vh", "Secret", WorksheetVisibility.VeryHidden, null, SheetKind.Chart) };
+                first.ShowWorksheets("Book", mixed, "v"); second.ShowWorksheets("Book", mixed, "v");
+                settings.SetShowHidden(true);
+                Check(first.Controls.OfType<ListBox>().Single().Items.Count == 2 && second.Controls.OfType<ListBox>().Single().Items.Count == 2, "Hidden switch reaches both window views");
+                settings.SetShowVeryHidden(true); settings.SetShowHidden(false);
+                Check(first.Controls.OfType<ListBox>().Single().Items.Cast<WorksheetItem>().Select(i => i.Id).SequenceEqual(new[] { "v", "vh" }), "VeryHidden independent of Hidden");
+                Check(new UserPreferences(path).ShowVeryHidden && !new UserPreferences(path).ShowHidden, "independent visibility options persist");
+                settings.SetShowVeryHidden(false);
+            }
             Check(!settings.ShowVeryHidden, "VeryHidden default off");
             using (var view = new SheetListControl(settings))
             {
@@ -129,7 +142,7 @@ internal static partial class SmokeTests
 
     private static void TestFilters()
     {
-        var settings = new UserPreferences(); settings.SetShowVeryHidden(true);
+        var settings = new UserPreferences(); settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
         using (var view = new SheetListControl(settings))
         {
             var rows = new[] {

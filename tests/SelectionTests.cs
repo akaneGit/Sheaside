@@ -45,7 +45,7 @@ internal static partial class SmokeTests
 
     private static void TestMultiSelection()
     {
-        var settings = new UserPreferences(); settings.SetShowVeryHidden(true);
+        var settings = new UserPreferences(); settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
         using (var view = new SheetListControl(settings) { Size = new Size(320, 500) })
         using (var otherWindow = new SheetListControl())
         {
