@@ -35,11 +35,24 @@ internal static partial class SmokeTests
             Check(dialog.Selection == null, "opening palette does not change color");
         using (var dialog = new ColorPaletteDialog(TabColorChoice.DefaultTheme()))
         {
-            var grid = dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<TableLayoutPanel>().Single();
+            var grid = dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<TableLayoutPanel>().Single(c => c.Name == "ThemeGrid");
             Check(grid.Controls.Count == 60, "palette grid exposes all theme shades");
             typeof(Button).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(grid.GetControlFromPosition(4, 2), new object[] { EventArgs.Empty });
             Check(dialog.Selection.Theme == 5 && dialog.Selection.Tint == .6 && dialog.DialogResult == DialogResult.OK, "palette button selects linked theme tint");
+        }
+        foreach (float scale in new[] { 1F, 1.25F, 1.5F })
+        using (var dialog = new ColorPaletteDialog(null))
+        {
+            dialog.Show();
+            dialog.Scale(new SizeF(scale, scale));
+            dialog.PerformLayout(); Application.DoEvents();
+            var layout = dialog.Controls.OfType<FlowLayoutPanel>().Single();
+            var standard = layout.Controls.OfType<TableLayoutPanel>().Single(c => c.Name == "StandardGrid");
+            Check(standard.Controls.Count == 10 && standard.Controls.Cast<Control>().All(c => c.Width > 10 && c.Height > 10 && standard.ClientRectangle.Contains(c.Bounds)), "standard colors visible with fallback at scale " + scale);
+            Check(!layout.VerticalScroll.Visible && !layout.HorizontalScroll.Visible && layout.Controls.Cast<Control>().All(c => layout.ClientRectangle.Contains(c.Bounds)), "complete palette fits without scroll at scale " + scale);
+            ((Button)standard.GetControlFromPosition(1, 0)).PerformClick();
+            Check(dialog.Selection.Rgb == ColorTranslator.ToOle(Color.Red) && !dialog.Selection.Theme.HasValue, "standard red selection independent of theme");
         }
         var settings = new UserPreferences(); settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
         using (var view = new SheetListControl(settings) { Size = new Size(260, 400) })
