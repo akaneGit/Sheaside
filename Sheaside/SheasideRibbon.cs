@@ -9,7 +9,11 @@ namespace Sheaside
     public sealed class SheasideRibbon : Office.IRibbonExtensibility
     {
         private Office.IRibbonUI ribbon;
-        private readonly object brandImage = PictureConverter.Convert(Controls.RibbonArtwork.Create(32));
+        private readonly object brandImage = CreateBrandImage();
+        private static object CreateBrandImage()
+        {
+            using (var image = Controls.RibbonArtwork.Create(32)) return PictureConverter.Convert(image);
+        }
         public object GetBrandImage(Office.IRibbonControl control) { return brandImage; }
         public object GetStateImage(Office.IRibbonControl control)
         {

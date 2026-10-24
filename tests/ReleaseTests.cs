@@ -33,7 +33,7 @@ internal static partial class SmokeTests
                 var rows = new[] { new WorksheetItem("v", "Visible", true), new WorksheetItem("h", "Secret", WorksheetVisibility.VeryHidden, null, SheetKind.Chart) };
                 view.ShowWorksheets("Book", rows, "v");
                 var list = view.Controls.OfType<ReorderableSheetListBox>().Single();
-                Check(list.Items.Count == 1 && view.IsFiltered, "VeryHidden omitted and reorder disabled");
+                Check(list.Items.Count == 1 && view.IsFiltered && list.ReorderEnabled, "VeryHidden omitted without disabling reorder");
                 settings.SetShowVeryHidden(true);
                 Check(list.Items.Count == 2 && !view.IsFiltered, "setting reveals cached VeryHidden rows");
                 InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
@@ -110,7 +110,7 @@ internal static partial class SmokeTests
             using (var bitmap = new System.Drawing.Bitmap(first.Width, first.Height))
             {
                 first.DrawToBitmap(bitmap, first.ClientRectangle);
-                bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc3-pane.png"));
+                bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc4-pane.png"));
             }
         }
     }
@@ -131,6 +131,17 @@ internal static partial class SmokeTests
             InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
             view.SetSearch("日本");
             Check(list.Items.Count == 1 && view.SelectedSheetIds.SequenceEqual(new[] { "v" }), "search prunes excluded selections");
+            view.Size = new System.Drawing.Size(260, 400);
+            list.CreateControl();
+            int starts = 0;
+            view.DragStarting += (s, e) =>
+            {
+                starts++;
+                Check(e.SelectedIds.SequenceEqual(new[] { "v" }) && e.Order.SequenceEqual(new[] { "v" }), "filtered drag carries only displayed selected IDs");
+            };
+            InvokeControl(list, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 8, 8, 0));
+            InvokeControl(list, "OnMouseMove", new MouseEventArgs(MouseButtons.Left, 0, 100, 40, 0));
+            Check(starts == 1 && list.ReorderEnabled, "search permits drag without restoring excluded targets");
             view.ClearSearchButton.PerformClick();
             Check(list.Items.Count == 4 && !view.ClearSearchButton.Visible && settings.ShowHidden && settings.ShowVeryHidden, "search reset preserves ribbon visibility switches");
             Check(view.SelectedSheetIds.SequenceEqual(new[] { "v" }), "search reset does not resurrect selections");
