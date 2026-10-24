@@ -6,14 +6,16 @@ namespace Sheaside.Models
 {
     internal sealed class WorksheetDragStartingEventArgs : CancelEventArgs
     {
-        public WorksheetDragStartingEventArgs(string worksheetId, IList<string> order) : base(true)
+        public WorksheetDragStartingEventArgs(string worksheetId, IList<string> order, IList<string> selectedIds = null) : base(true)
         {
             WorksheetId = worksheetId;
             Order = new List<string>(order).AsReadOnly();
+            SelectedIds = new List<string>(selectedIds ?? new[] { worksheetId }).AsReadOnly();
         }
 
         public string WorksheetId { get; private set; }
         public IList<string> Order { get; private set; }
+        public IList<string> SelectedIds { get; private set; }
     }
 
     internal sealed class WorksheetDropEventArgs : EventArgs

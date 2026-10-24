@@ -243,7 +243,7 @@ namespace Sheaside.Controls
             string query = searchBox.Text;
             worksheets = worksheets.Where(i => i.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0).ToArray();
             IsFiltered = query.Length > 0 || worksheets.Count != snapshot.Count;
-            sheetList.ReorderEnabled = !IsFiltered;
+            sheetList.ReorderEnabled = true;
             workbookLabel.Text = workbookName;
             CaptureSelection();
             selection.Reconcile(worksheets.Select(item => item.Id), activeId, preferredId);

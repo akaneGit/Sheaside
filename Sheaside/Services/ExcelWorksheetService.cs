@@ -26,6 +26,71 @@ namespace Sheaside.Services
             public string[] WorksheetIds;
             public int SourceIndex;
         }
+        internal sealed class GroupMoveSession
+        {
+            public MoveSession Snapshot;
+            public string[] Displayed;
+            public WorksheetItem[] Items;
+        }
+
+        public GroupMoveSession CaptureGroupMove(int handle, IList<string> selected, IList<string> displayed)
+        {
+            var window = FindWindow(handle);
+            if (window == null) throw new InvalidOperationException("対象ウィンドウが閉じられました。");
+            var rows = GetWorksheets(GetWorkbook(window));
+            var full = rows.Select(i => i.Id).ToArray();
+            WorksheetMoveRules.GroupOrder(full, displayed, selected, 0);
+            var session = new GroupMoveSession { Snapshot = CaptureMove(handle, selected[0], full),
+                Displayed = displayed.ToArray(), Items = rows.Where(i => selected.Contains(i.Id)).ToArray() };
+            ValidateGroupMove(session);
+            return session;
+        }
+
+        public void ValidateGroupMove(GroupMoveSession session)
+        {
+            ValidateMove(session.Snapshot);
+            ValidateGroupItems(session);
+        }
+
+        private void ValidateGroupItems(GroupMoveSession session)
+        {
+            var current = GetWorksheets(session.Snapshot.Target.Workbook);
+            foreach (var item in session.Items)
+                if (!current.Any(i => i.Id == item.Id && i.Name == item.Name && i.Kind == item.Kind && i.Visibility == item.Visibility))
+                    throw new InvalidOperationException("ドラッグ中に対象シートの状態が変わりました。もう一度操作してください。");
+        }
+
+        public SheetBatchResult MoveWorksheets(GroupMoveSession session, int boundary)
+        {
+            string[] desired = null;
+            var expected = session.Snapshot.WorksheetIds.ToArray();
+            string right = null, left = null;
+            return SheetBatchRunner.Run(session.Items, () =>
+            {
+                ValidateGroupMove(session);
+                desired = WorksheetMoveRules.GroupOrder(expected, session.Displayed, session.Items.Select(i => i.Id).ToArray(), boundary);
+                int first = Array.IndexOf(desired, session.Items[0].Id);
+                int after = first + session.Items.Length;
+                right = after < desired.Length ? desired[after] : null;
+                left = first > 0 ? desired[first - 1] : null;
+            }, (index, result) =>
+            {
+                ValidateGroupItems(session);
+                var current = CaptureMove(session.Snapshot.Target.WindowHandle, result.Item.Id, expected);
+                if (expected.SequenceEqual(desired)) { result.Status = SheetBatchStatus.Skipped; return; }
+                int gap = right != null ? Array.IndexOf(expected, right) : (left == null ? 0 : Array.IndexOf(expected, left) + 1);
+                int destination = WorksheetMoveRules.DestinationIndex(current.SourceIndex, gap, expected.Length);
+                bool moved = MoveWorksheet(current, gap);
+                var next = expected.ToList();
+                next.RemoveAt(current.SourceIndex);
+                next.Insert(destination, result.Item.Id);
+                expected = next.ToArray();
+                left = result.Item.Id;
+                if (index == session.Items.Length - 1 && !expected.SequenceEqual(desired))
+                    throw new InvalidOperationException("指定した順序に移動できませんでした。一覧の実際の順序を確認してください。");
+                result.Status = moved ? SheetBatchStatus.Succeeded : SheetBatchStatus.Skipped;
+            });
+        }
         private readonly Excel.Application application;
         // Keep identities stable even before Excel initializes CodeName. References
         // live only as long as the open workbook; deleted rows are pruned on refresh.

@@ -122,7 +122,7 @@ namespace Sheaside.Controls
             if (!dispatchingPointer)
             {
                 PointerModifiers = ModifierKeys;
-                blockDragGesture = SelectedItems.Count > 1 || (PointerModifiers & (Keys.Control | Keys.Shift)) != 0;
+                blockDragGesture = (PointerModifiers & (Keys.Control | Keys.Shift)) != 0;
             }
             if (e.Button == MouseButtons.Right)
             {
@@ -149,7 +149,7 @@ namespace Sheaside.Controls
             string description = hover >= 0 ? ((WorksheetItem)Items[hover]).AccessibleDescription : "";
             if (description != tooltipText) { tooltipText = description; rowTooltip.SetToolTip(this, IsDragging ? "" : description); }
             if (pointerTracking && blockDragGesture && OutsideDragThreshold(e.Location)) consumedClick = true;
-            if (!ReorderEnabled || e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging || SelectedItems.Count > 1) return;
+            if (!ReorderEnabled || e.Button != MouseButtons.Left || mouseDownItem == null || IsDragging) return;
             if (!OutsideDragThreshold(e.Location)) return;
             sourceIndex = Items.IndexOf(mouseDownItem);
             if (sourceIndex < 0) { mouseDownItem = null; return; }
@@ -161,7 +161,7 @@ namespace Sheaside.Controls
             try
             {
                 var request = new WorksheetDragStartingEventArgs(mouseDownItem.Id,
-                    Items.Cast<WorksheetItem>().Select(item => item.Id).ToArray());
+                    Items.Cast<WorksheetItem>().Select(item => item.Id).ToArray(), SelectedItems.Cast<WorksheetItem>().Select(item => item.Id).ToArray());
                 DragStarting?.Invoke(this, request);
                 if (request.Cancel || cancelled) return;
                 // A string survives OLE's data marshaling; object identity does not.
@@ -198,7 +198,7 @@ namespace Sheaside.Controls
             int anchor = AnchorIndex;
             pointerIndex = IndexFromPoint(point);
             PointerModifiers = modifiers;
-            blockDragGesture = previous.Length > 1 || (modifiers & (Keys.Control | Keys.Shift)) != 0;
+            blockDragGesture = (modifiers & (Keys.Control | Keys.Shift)) != 0;
             pointerClicks = clicks;
             collapseOnClick = false;
             Focus();
@@ -293,7 +293,7 @@ namespace Sheaside.Controls
 
         private bool ChangesOrder(int boundary)
         {
-            return boundary >= 0 && WorksheetMoveRules.DestinationIndex(sourceIndex, boundary, Items.Count) != sourceIndex;
+            return boundary >= 0 && boundary <= Items.Count; // Service resolves no-op against the full Excel order.
         }
 
         protected override void OnDragEnter(DragEventArgs e) { UpdateDrag(e); base.OnDragEnter(e); }

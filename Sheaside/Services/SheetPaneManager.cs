@@ -40,7 +40,8 @@ namespace Sheaside.Services
         private bool operating;
         private int? activeHandle;
         private PaneEntry draggingEntry;
-        private ExcelWorksheetService.MoveSession moveSession;
+        private ExcelWorksheetService.GroupMoveSession moveSession;
+        private SheetBatchResult dragResult;
         private bool dragCancelled;
         private string dragStatus;
 
@@ -139,7 +140,7 @@ namespace Sheaside.Services
             {
                 if (!dragCancelled)
                 {
-                    try { worksheets.ValidateMove(moveSession); }
+                    try { worksheets.ValidateGroupMove(moveSession); }
                     catch (Exception exception) when (IsOperationError(exception)) { CancelCurrentDrag(OperationErrorMessage(exception)); }
                 }
                 return; // Never dispose/rebind a native control inside its OLE drag loop.
@@ -375,14 +376,15 @@ namespace Sheaside.Services
 
         private void StartDrag(int handle, PaneEntry entry, WorksheetDragStartingEventArgs args)
         {
-            if (disposed || operating || draggingEntry != null || entry.View.IsFiltered) return;
+            if (disposed || operating || draggingEntry != null) return;
             try
             {
-                moveSession = worksheets.CaptureMove(handle, args.WorksheetId, args.Order);
+                moveSession = worksheets.CaptureGroupMove(handle, args.SelectedIds, args.Order);
                 draggingEntry = entry;
                 dragCancelled = false;
                 dragStatus = null;
-                entry.PreferredSelection = args.WorksheetId;
+                entry.PreferredSelection = args.SelectedIds.Count == 1 ? args.WorksheetId : null;
+                dragResult = null;
                 args.Cancel = false;
             }
             catch (Exception exception) when (IsOperationError(exception))
@@ -406,8 +408,7 @@ namespace Sheaside.Services
             operating = true;
             try
             {
-                bool moved = worksheets.MoveWorksheet(moveSession, args.Boundary);
-                entry.PreferredSelection = worksheets.GetWorksheetId(moveSession.Target.Sheet);
+                dragResult = worksheets.MoveWorksheets(moveSession, args.Boundary);
                 dragStatus = null;
             }
             catch (Exception exception) when (IsOperationError(exception))
@@ -423,12 +424,20 @@ namespace Sheaside.Services
         {
             if (draggingEntry != null && draggingEntry != entry) return;
             string status = dragStatus;
+            var result = dragResult;
+            dragResult = null;
             draggingEntry = null;
             moveSession = null; // Release our short-lived COM references, not shared RCWs.
             dragStatus = null;
             dragCancelled = false;
             Refresh();
             if (!entry.View.IsDisposed && status != null) entry.View.ShowStatus(status);
+            if (!entry.View.IsDisposed && result != null && (result.Error != null || result.Count(SheetBatchStatus.Failed) > 0))
+            {
+                operating = true;
+                try { using (var dialog = new BatchDetailsDialog("並び替えの結果", result.Summary, result.Details, false)) dialog.ShowDialog(entry.View); }
+                finally { operating = false; Refresh(); }
+            }
         }
 
         private static bool IsOperationError(Exception exception)

@@ -12,6 +12,14 @@ internal static partial class SmokeTests
 {
     private static void TestReorderRules()
     {
+        var full = new[] { "A", "B", "C", "D", "E" };
+        Check(WorksheetMoveRules.GroupOrder(full, full, new[] { "D", "B" }, 0).SequenceEqual(new[] { "B", "D", "A", "C", "E" }), "group preserves original relative order");
+        Check(WorksheetMoveRules.GroupOrder(full, new[] { "B", "D" }, new[] { "B" }, 2).SequenceEqual(new[] { "A", "C", "D", "B", "E" }), "filtered end is after final displayed tab, before excluded trailing tabs");
+        Check(WorksheetMoveRules.GroupOrder(full, new[] { "B", "D" }, new[] { "D" }, 0).SequenceEqual(new[] { "A", "D", "B", "C", "E" }), "filtered beginning retains excluded leading tabs");
+        Check(WorksheetMoveRules.GroupOrder(full, full, full, 3).SequenceEqual(full), "all selected is no-op");
+        Reject(() => WorksheetMoveRules.GroupOrder(full, new[] { "D", "B" }, new[] { "D" }, 0), "reject stale display order");
+        Reject(() => WorksheetMoveRules.GroupOrder(full, new[] { "B", "D" }, new[] { "A" }, 0), "exclude hidden selection from movement");
+        Reject(() => WorksheetMoveRules.GroupOrder(full, full, new[] { "B", "B" }, 0), "reject duplicated selected IDs");
         for (int count = 1; count <= 7; count++)
         for (int source = 0; source < count; source++)
         for (int gap = 0; gap <= count; gap++)
@@ -108,7 +116,7 @@ internal static partial class SmokeTests
             Point self = list.PointToScreen(new Point(4, 4));
             var selfOver = new DragEventArgs(data, 1, self.X, self.Y, DragDropEffects.Move, DragDropEffects.Move);
             InvokeControl(list, "OnDragOver", selfOver);
-            Check(selfOver.Effect == DragDropEffects.None, "no-op has no drop effect");
+            Check(selfOver.Effect == DragDropEffects.Move, "service decides no-op from complete workbook order");
             view.CancelDrag();
             var query = new QueryContinueDragEventArgs(1, false, DragAction.Continue);
             InvokeControl(list, "OnQueryContinueDrag", query);
@@ -148,6 +156,36 @@ internal static partial class SmokeTests
             Func<Excel.Worksheet, ExcelWorksheetService.MoveSession> capture = sheet => service.CaptureMove(handle,
                 service.GetWorksheetId(sheet), service.GetWorksheets(book).Select(item => item.Id).ToArray());
             Func<string> order = () => string.Join(",", service.GetWorksheets(book).Where(item => item.Kind == SheetKind.Worksheet).Select(item => item.Name));
+
+            var initial = service.GetWorksheets(book).Select(i => i.Id).ToArray();
+            var moving = new[] { service.GetWorksheetId(d), service.GetWorksheetId(middleChart), service.GetWorksheetId(b) };
+            foreach (int gap in new[] { 0, initial.Length, 3 })
+            {
+                var full = service.GetWorksheets(book).Select(i => i.Id).ToArray();
+                var expectedGroup = WorksheetMoveRules.GroupOrder(full, full, moving, gap);
+                var result = service.MoveWorksheets(service.CaptureGroupMove(handle, moving, full), gap);
+                Check(result.Error == null && service.GetWorksheets(book).Select(i => i.Id).SequenceEqual(expectedGroup), "mixed chart worksheet group moves with original relative order");
+            }
+            var filtered = service.GetWorksheets(book).Where(i => i.Name == "A" || i.Name == "D").Select(i => i.Id).ToArray();
+            var expectedFiltered = WorksheetMoveRules.GroupOrder(service.GetWorksheets(book).Select(i => i.Id).ToArray(), filtered, new[] { filtered[0] }, 2);
+            var filteredResult = service.MoveWorksheets(service.CaptureGroupMove(handle, new[] { filtered[0] }, filtered), 2);
+            Check(filteredResult.Error == null && service.GetWorksheets(book).Select(i => i.Id).SequenceEqual(expectedFiltered), "filtered group uses complete Excel tab order");
+            foreach (string id in initial.Reverse()) service.MoveWorksheet(service.CaptureMove(handle, id, service.GetWorksheets(book).Select(i => i.Id).ToArray()), 0);
+            var groupStale = service.CaptureGroupMove(handle, moving, initial);
+            book.Protect(Password: "group", Structure: true);
+            var rejectedGroup = service.MoveWorksheets(groupStale, 0);
+            Check(rejectedGroup.Error != null && rejectedGroup.Count(SheetBatchStatus.NotProcessed) == 3, "protected group rejects all before mutation");
+            book.Unprotect("group");
+            Check(service.GetWorksheets(book).Select(i => i.Id).SequenceEqual(initial), "rejected group leaves workbook unchanged");
+            a.Activate();
+            b.Visible = Excel.XlSheetVisibility.xlSheetHidden;
+            middleChart.Visible = Excel.XlSheetVisibility.xlSheetVeryHidden;
+            var hiddenGroup = service.MoveWorksheets(service.CaptureGroupMove(handle, moving, initial), 0);
+            Check(hiddenGroup.Error == null && b.Visible == Excel.XlSheetVisibility.xlSheetHidden && middleChart.Visible == Excel.XlSheetVisibility.xlSheetVeryHidden,
+                "group move preserves Hidden worksheet and VeryHidden chart visibility");
+            b.Visible = Excel.XlSheetVisibility.xlSheetVisible;
+            middleChart.Visible = Excel.XlSheetVisibility.xlSheetVisible;
+            foreach (string id in initial.Reverse()) service.MoveWorksheet(service.CaptureMove(handle, id, service.GetWorksheets(book).Select(i => i.Id).ToArray()), 0);
 
             Check(service.MoveWorksheet(capture(d), 0) && order() == "D,A,B,C", "move last to first with charts");
             Check(service.MoveWorksheet(capture(d), book.Sheets.Count) && order() == "A,B,C,D", "move first to last with charts");
@@ -189,7 +227,10 @@ internal static partial class SmokeTests
             added.Delete();
             Reject(() => service.CaptureMove(handle, service.GetWorksheetId(a), new[] { "wrong snapshot" }), "outdated displayed order refused");
             stale = capture(a);
+            groupStale = service.CaptureGroupMove(handle, moving, service.GetWorksheets(book).Select(i => i.Id).ToArray());
             var secondWindow = book.NewWindow();
+            rejectedGroup = service.MoveWorksheets(groupStale, 0);
+            Check(rejectedGroup.Error != null && rejectedGroup.Count(SheetBatchStatus.NotProcessed) == 3, "window switch rejects complete group without mutation");
             Reject(() => service.MoveWorksheet(stale, 0), "same workbook window switch cancels move");
             handle = secondWindow.Hwnd;
             stale = capture(a);
