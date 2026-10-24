@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$Path)
+param([Parameter(Mandatory=$true)][string]$Path, [string]$ExpectedVersion = '0.99.5')
 $ErrorActionPreference = 'Stop'
 $installer = New-Object -ComObject WindowsInstaller.Installer
 $database = $installer.OpenDatabase([IO.Path]::GetFullPath($Path), 0)
@@ -20,7 +20,8 @@ function Read-Rows([string]$query, [int]$columns) {
 }
 try {
     $properties = @{}; Read-Rows 'SELECT `Property`, `Value` FROM `Property`' 2 | ForEach-Object { $properties[$_[0]]=$_[1] }
-    Assert-Msi ($properties.ProductVersion -eq '0.99.2') 'numeric RC version'
+    Assert-Msi ($properties.ProductVersion -eq $ExpectedVersion) 'numeric RC version'
+    if ($ExpectedVersion -eq '0.99.5') { Assert-Msi ($properties.ProductCode -ne '{5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2}') 'new ProductCode differs from rc.2' }
     Assert-Msi (-not $properties.ContainsKey('ALLUSERS')) 'per-user installation'
     Assert-Msi ($properties.UpgradeCode -eq '{E2087C97-A6B5-4089-B8F5-86DB64EBB425}') 'stable upgrade family'
     $files = @(Read-Rows 'SELECT `FileName` FROM `File`' 1 | ForEach-Object { $_[0].Split('|')[-1] })
@@ -31,6 +32,10 @@ try {
     Assert-Msi (@($registry | Where-Object { $_[2] -eq 'Manifest' -and $_[3] -eq 'file:///[INSTALLFOLDER]Sheaside.vsto|vstolocal' }).Count -eq 1) 'local manifest, no ClickOnce cache'
     Assert-Msi (@($registry | Where-Object { $_[2] -eq 'LoadBehavior' -and $_[3] -eq '#3' }).Count -eq 1) 'load on Excel startup'
     Assert-Msi (@(Read-Rows 'SELECT `UpgradeCode` FROM `Upgrade`' 1).Count -ge 2) 'upgrade and downgrade detection'
+    $upgrades = @(Read-Rows 'SELECT `VersionMin`, `VersionMax`, `Attributes`, `ActionProperty` FROM `Upgrade`' 4)
+    Assert-Msi (@($upgrades | Where-Object { $_[1] -eq $ExpectedVersion -and $_[3] -eq 'WIX_UPGRADE_DETECTED' }).Count -eq 1) 'older versions detected below current version'
+    Assert-Msi (@($upgrades | Where-Object { $_[0] -eq $ExpectedVersion -and $_[3] -eq 'WIX_DOWNGRADE_DETECTED' }).Count -eq 1) 'newer versions detected for downgrade block'
+    Assert-Msi (@(Read-Rows 'SELECT `Action` FROM `InstallExecuteSequence`' 1 | Where-Object { $_[0] -eq 'RemoveExistingProducts' }).Count -eq 1) 'major upgrade removes detected old product'
     Assert-Msi (@(Read-Rows 'SELECT `Condition` FROM `LaunchCondition`' 1).Count -ge 3) 'runtime and downgrade prerequisites'
     Assert-Msi (@(Read-Rows 'SELECT `Cabinet` FROM `Media`' 1 | Where-Object { $_[0].StartsWith('#') }).Count -eq 1) 'embedded cabinet for single MSI distribution'
     Write-Output "PASS: $script:checks MSI assertions (read-only; install/repair/uninstall not executed)"

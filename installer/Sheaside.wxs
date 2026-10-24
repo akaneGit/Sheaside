@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <!-- MSI has a numeric version; RC 0.99.2 upgrades to final 1.0.0. -->
-  <Package Name="Sheaside 1.0.0-rc.2" Manufacturer="Sheaside" Version="0.99.2"
-           ProductCode="{5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2}"
+  <!-- MSI has a numeric version; RC 0.99.5 upgrades to final 1.0.0. -->
+  <Package Name="Sheaside 1.0.0-rc.5" Manufacturer="Sheaside" Version="0.99.5"
+           ProductCode="{834E3417-08C4-4078-A73B-6A05AF410909}"
            UpgradeCode="{E2087C97-A6B5-4089-B8F5-86DB64EBB425}" Scope="perUser" Language="1033">
     <MajorUpgrade DowngradeErrorMessage="A newer Sheaside version is already installed." />
     <MediaTemplate EmbedCab="yes" />

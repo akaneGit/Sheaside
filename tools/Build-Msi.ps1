@@ -13,15 +13,18 @@ if (-not $SkipBuild) {
 foreach ($name in @('Sheaside.dll','Sheaside.dll.manifest','Sheaside.vsto','Microsoft.Office.Tools.Common.v4.0.Utilities.dll')) {
     if (-not (Test-Path -LiteralPath (Join-Path $payload $name))) { throw "Missing payload: $name" }
 }
+$version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $payload 'Sheaside.dll'))
+if ($version.FileVersion -ne '1.0.0.5' -or $version.ProductVersion -ne '1.0.0-rc.5') { throw 'Payload is not rc.5.' }
 $toolDir = Join-Path $repoRoot 'Sheaside/obj/wix'
 $wix = Join-Path $toolDir 'wix.exe'
 if (-not (Test-Path -LiteralPath $wix)) {
     & dotnet tool install wix --version 4.0.6 --tool-path $toolDir --allow-roll-forward
     if ($LASTEXITCODE -ne 0) { throw 'WiX 4.0.6 installation failed (.NET SDK and NuGet access required).' }
 }
-$artifacts = Join-Path $repoRoot 'artifacts'
+$artifacts = Join-Path $repoRoot 'artifacts/rc.5'
+if (Test-Path -LiteralPath $artifacts) { throw 'Output folder already exists; preserve prior artifacts and choose a new destination.' }
 [void][IO.Directory]::CreateDirectory($artifacts)
-$msi = Join-Path $artifacts 'Sheaside-1.0.0-rc.2.msi'
+$msi = Join-Path $artifacts 'Sheaside-1.0.0-rc.5.msi'
 & $wix build (Join-Path $repoRoot 'installer/Sheaside.wxs') -arch x86 -d "Payload=$payload" -pdbtype none -out $msi
 if ($LASTEXITCODE -ne 0) { throw 'MSI compilation or ICE validation failed.' }
 & (Join-Path $PSScriptRoot 'Test-Msi.ps1') -Path $msi
@@ -35,8 +38,14 @@ foreach ($id in $fileMap.Keys) {
     if ($actual -ne $expected) { throw "MSI payload hash mismatch: $id" }
 }
 Write-Output 'PASS: 4 extracted MSI payload hashes match Release output'
-Copy-Item -LiteralPath (Join-Path $repoRoot 'docs/deployment.md') -Destination (Join-Path $artifacts 'INSTALL.md') -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs/deployment.md') -Destination (Join-Path $artifacts 'INSTALL.md')
 $hash = (Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash
-[IO.File]::WriteAllText((Join-Path $artifacts 'SHA256SUMS.txt'), "$hash  Sheaside-1.0.0-rc.2.msi`r`n")
-Compress-Archive -LiteralPath $msi,(Join-Path $artifacts 'INSTALL.md'),(Join-Path $artifacts 'SHA256SUMS.txt') -DestinationPath (Join-Path $artifacts 'Sheaside-1.0.0-rc.2.zip') -Force
-Write-Output "Created: $msi"
+[IO.File]::WriteAllText((Join-Path $artifacts 'MSI-SHA256.txt'), "$hash  Sheaside-1.0.0-rc.5.msi`r`n")
+
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs/rc.5-install-checklist.md') -Destination (Join-Path $artifacts 'CHECKLIST.md')
+# Create ZIP once, including only the allowlisted distribution files.
+$zip = Join-Path $artifacts 'Sheaside-1.0.0-rc.5.zip'
+Compress-Archive -LiteralPath $msi,(Join-Path $artifacts 'INSTALL.md'),(Join-Path $artifacts 'CHECKLIST.md'),(Join-Path $artifacts 'MSI-SHA256.txt') -DestinationPath $zip
+$zipHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
+[IO.File]::WriteAllText((Join-Path $artifacts 'SHA256SUMS.txt'), "$hash  Sheaside-1.0.0-rc.5.msi`r`n$zipHash  Sheaside-1.0.0-rc.5.zip`r`n")
+Write-Output "Created: $msi and $zip"
