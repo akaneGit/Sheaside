@@ -149,7 +149,7 @@ internal static partial class SmokeTests
         string file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "readonly-" + Guid.NewGuid().ToString("N") + ".xlsx");
         try
         {
-            excel = new Excel.Application { Visible = false, DisplayAlerts = false };
+            excel = new Excel.Application { Visible = true, DisplayAlerts = false };
             Console.WriteLine("Excel version: " + excel.Version);
             var service = new ExcelWorksheetService(excel);
             book = excel.Workbooks.Add(Excel.XlWBATemplate.xlWBATWorksheet);

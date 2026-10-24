@@ -196,7 +196,7 @@ internal static partial class SmokeTests
 
     private static void TestExcelSelection()
     {
-        var excel = new Excel.Application { Visible = false, DisplayAlerts = false };
+        var excel = new Excel.Application { Visible = true, DisplayAlerts = false };
         Excel.Workbook book = null;
         Excel.Workbook other = null;
         try

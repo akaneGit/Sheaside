@@ -59,7 +59,7 @@ internal static partial class SmokeTests
 
     private static void TestExcelBatch()
     {
-        var excel = new Excel.Application { Visible = false, DisplayAlerts = false };
+        var excel = new Excel.Application { Visible = true, DisplayAlerts = false };
         Excel.Workbook book = null, other = null, readOnly = null;
         string file = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "batch-" + Guid.NewGuid().ToString("N") + ".xlsx");
         try

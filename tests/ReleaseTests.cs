@@ -43,32 +43,14 @@ internal static partial class SmokeTests
                 Check(view.SelectedSheetIds.SequenceEqual(new[] { "v" }), "revealed rows do not silently regain selection");
             }
             Check(new UserPreferences(path).ShowVeryHidden, "settings persist across instances");
-            settings.SetOptions(true, false);
+            settings.SetShowHidden(true);
             var restored = new UserPreferences(path);
-            Check(!restored.StartupVisible && restored.ShowVeryHidden, "all settings persist together");
+            Check(restored.ShowHidden && restored.ShowVeryHidden, "both display settings persist");
             int events = 0; restored.Changed += (s, e) => events++;
-            restored.SetOptions(true, false);
+            restored.SetShowHidden(true);
             Check(events == 0, "unchanged settings do not trigger redraw");
-            File.WriteAllText(path, "<Sheaside theme=\"invalid-obsolete\" dockLeft=\"true\" startupVisible=\"false\" showVeryHidden=\"true\" />");
-            Check(new UserPreferences(path).LoadError == null && !new UserPreferences(path).StartupVisible, "obsolete settings ignored" );
-            using (var dialog = new PreferencesDialog(restored))
-                Check(!dialog.StartupVisible && dialog.ShowVeryHidden, "settings dialog initializes saved values");
-            foreach (float scale in new[] { 1F, 1.25F, 1.5F })
-                using (var dialog = new PreferencesDialog(restored, OfficeTheme.Black))
-                {
-                    dialog.StartPosition = FormStartPosition.Manual; dialog.Location = new System.Drawing.Point(-10000, -10000);
-                    dialog.Show(); dialog.Scale(new System.Drawing.SizeF(scale, scale)); dialog.PerformLayout();
-                    var layout = dialog.Controls.OfType<TableLayoutPanel>().Single();
-                    var descriptions = layout.Controls.OfType<Label>().ToArray();
-                    Check(dialog.ClientSize.Width >= 440 * scale && layout.Bottom <= dialog.ClientSize.Height - dialog.Padding.Bottom, "whole settings layout fits client area at scale " + scale);
-                    Check(descriptions.Length == 2 && descriptions.Any(l => l.Text.Contains("新しいウィンドウを開く")), "settings explain Excel window command at scale " + scale);
-                    Check(descriptions.All(l => l.Height >= l.GetPreferredSize(new System.Drawing.Size(l.Width, 0)).Height && l.Right <= layout.ClientSize.Width), "settings descriptions fit at scale " + scale);
-                    Check(dialog.BackColor == UiAppearance.Background(OfficeTheme.Black) && descriptions.All(l => l.ForeColor == dialog.ForeColor), "settings inherit Office theme at scale " + scale);
-                    Check(layout.Controls.OfType<CheckBox>().Select(c => c.Left).Distinct().Count() == 1, "settings checkbox alignment at scale " + scale);
-                    if (scale == 1F) using (var bitmap = new System.Drawing.Bitmap(dialog.Width, dialog.Height))
-                    { dialog.DrawToBitmap(bitmap, new System.Drawing.Rectangle(System.Drawing.Point.Empty, dialog.Size)); bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc3-settings.png")); }
-                    dialog.Close();
-                }
+            File.WriteAllText(path, "<Sheaside theme=\"obsolete\" dockLeft=\"true\" startupVisible=\"true\" />");
+            Check(new UserPreferences(path).LoadError == null && !new UserPreferences(path).ShowHidden, "obsolete settings ignored safely");
             var failing = new UserPreferences(Path.Combine(path, "child.xml"));
             try { failing.SetShowVeryHidden(true); throw new Exception("Expected write failure"); }
             catch (IOException) { Check(!failing.ShowVeryHidden, "failed save keeps in-memory settings unchanged"); }
@@ -124,14 +106,7 @@ internal static partial class SmokeTests
             Check(first.AddButton is ModernButton && first.DeleteButton is ModernButton && first.AddButton.Height == first.DeleteButton.Height, "action buttons use unified renderer and equal height");
             first.Size = new System.Drawing.Size(300, 520);
             first.ShowWorksheets("UI preview", new[] { new WorksheetItem("a", "売上", true), new WorksheetItem("b", "集計", WorksheetVisibility.Hidden, 255), new WorksheetItem("c", "グラフ", WorksheetVisibility.Visible, null, SheetKind.Chart) }, "a");
-            first.SetFilter("", WorksheetVisibility.Visible, null);
-            first.ToggleFilterPopup(); first.PerformLayout();
-            Check(first.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<ModernButton>().Count(b => b.Selected) == 2, "popup clearly marks one state and one kind");
-            using (var popupImage = new System.Drawing.Bitmap(first.FilterPopup.Width, first.FilterPopup.Height))
-            {
-                first.FilterPopup.DrawToBitmap(popupImage, first.FilterPopup.ClientRectangle);
-                popupImage.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rc3-filter.png"));
-            }
+            first.PerformLayout();
             using (var bitmap = new System.Drawing.Bitmap(first.Width, first.Height))
             {
                 first.DrawToBitmap(bitmap, first.ClientRectangle);
@@ -142,81 +117,32 @@ internal static partial class SmokeTests
 
     private static void TestFilters()
     {
-        var settings = new UserPreferences(); settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
+        var settings = new UserPreferences();
         using (var view = new SheetListControl(settings))
         {
-            var rows = new[] {
-                new WorksheetItem("a", "Sales 日本", true),
-                new WorksheetItem("b", "sales chart", WorksheetVisibility.Hidden, null, SheetKind.Chart),
-                new WorksheetItem("c", "Other", true),
-                new WorksheetItem("d", "sales secret", WorksheetVisibility.VeryHidden, null) };
-            view.ShowWorksheets("Book", rows, "a");
+            var rows = new[] { new WorksheetItem("v", "Sales 日本", true), new WorksheetItem("h", "Sales hidden", WorksheetVisibility.Hidden, null), new WorksheetItem("c", "Sales chart", WorksheetVisibility.Visible, null, SheetKind.Chart), new WorksheetItem("vh", "Sales secret", WorksheetVisibility.VeryHidden, null) };
+            view.ShowWorksheets("Book", rows, "v");
             var list = view.Controls.OfType<ReorderableSheetListBox>().Single();
+            Check(list.Items.Count == 2 && !view.ClearSearchButton.Visible, "visible worksheets and charts shown by default");
+            view.SetSearch("SALES");
+            Check(list.Items.Count == 2 && view.ClearSearchButton.Visible, "case insensitive realtime search");
+            settings.SetShowHidden(true); settings.SetShowVeryHidden(true);
+            Check(list.Items.Count == 4, "display switches combine with search");
             InvokeControl(list, "OnKeyDown", new KeyEventArgs(Keys.Control | Keys.A));
-            view.SetFilter("SALES", null, null);
-            Check(view.SelectedSheetIds.SequenceEqual(new[] { "a", "b", "d" }) && view.IsFiltered, "search preserves tab order and prunes excluded selection");
-            view.SetFilter("", WorksheetVisibility.Hidden, SheetKind.Chart);
-            Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "b", "combined visibility and chart filters");
-            view.SetFilter("日本", null, SheetKind.Worksheet);
-            Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "a", "Japanese substring search");
-            int drags = 0;
-            view.DragStarting += (s, e) => drags++;
-            InvokeControl(list, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 8, 8, 0));
-            InvokeControl(list, "OnMouseMove", new MouseEventArgs(MouseButtons.Left, 0, 100, 100, 0));
-            Check(drags == 0 && !list.IsDragging, "filtered single row cannot initiate a drag");
-            InvokeControl(list, "OnMouseUp", new MouseEventArgs(MouseButtons.Left, 1, 100, 100, 0));
-            view.SetFilter("absent", null, null);
-            Check(list.Items.Count == 0 && view.SelectedSheetIds.Length == 0, "empty search has no operation targets");
-            view.SetFilter("", null, null);
-            Check(list.Items.Count == 4 && view.SelectedSheetIds.Length == 0 && !view.IsFiltered, "clear filters does not resurrect selection");
-            view.SetFilter("new", null, null);
-            rows[2] = new WorksheetItem("c", "New title", true);
-            view.ShowWorksheets("Book", rows, "a");
-            Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Id == "c", "external rename updates filtered snapshot");
-            settings.SetShowVeryHidden(false);
-            view.SetFilter("", WorksheetVisibility.VeryHidden, null);
-            Check(list.Items.Count == 0, "VeryHidden filter cannot bypass opt-in");
-            view.SetFilter("sales", null, null);
-            Check(!view.HasFacetFilter && view.IsFiltered, "text search is independent of facet indicator");
-            view.Size = new System.Drawing.Size(190, 300);
-            view.ToggleFilterPopup();
-            Check(view.FilterPopup.Right <= view.ClientSize.Width && view.FilterPopup.Bottom <= view.ClientSize.Height, "popup stays inside narrow pane");
-            var options = view.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().ToArray();
-            Check(options.All(b => !b.Text.Contains("VeryHidden")), "VeryHidden not offered when setting off");
-            options.Single(b => b.Text.Contains("非表示")).PerformClick();
-            Check(view.HasFacetFilter && list.Items.Count == 1, "popup applies state while preserving query");
-            view.ToggleFilterPopup();
-            Check(view.ClearFilterButton.Visible && !view.FilterPopup.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().Any(b => b.Text == "フィルター解除"), "only external facet reset exists");
-            view.HandlePopupPointer(view.PointToScreen(new System.Drawing.Point(-10, -10)));
-            Check(!view.FilterPopup.Visible && view.HasFacetFilter, "outside click closes without resetting facets");
-            view.ToggleFilterPopup(); view.ToggleFilterPopup();
-            Check(!view.FilterPopup.Visible, "filter toggle closes popup");
-            view.ToggleFilterPopup();
-            var escape = Message.Create(IntPtr.Zero, 0x100, (IntPtr)Keys.Escape, IntPtr.Zero);
-            typeof(SheetListControl).GetMethod("ProcessCmdKey", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(view, new object[] { escape, Keys.Escape });
-            Check(!view.FilterPopup.Visible && view.HasFacetFilter, "escape closes popup and retains facets");
-            view.ToggleFilterPopup();
-            view.HandlePopupPointer(view.FilterPopup.PointToScreen(new System.Drawing.Point(10, 10)));
-            Check(view.FilterPopup.Visible, "pointer inside popup keeps it open");
-            InvokeControl(view, "OnLeave", EventArgs.Empty);
-            Check(!view.FilterPopup.Visible && view.HasFacetFilter, "focus moving to native Excel dismisses popup without resetting");
-            view.ToggleFilterPopup();
-            var deactivate = Message.Create(IntPtr.Zero, 0x1C, IntPtr.Zero, IntPtr.Zero);
-            Check(!view.PreFilterMessage(ref deactivate) && !view.FilterPopup.Visible, "application deactivate dismisses and never swallows native message");
-            view.ClearFilterButton.PerformClick();
-            Check(!view.ClearFilterButton.Visible, "reset hidden when facets cleared");
-            Check(!view.HasFacetFilter && list.Items.Count == 2 && view.IsFiltered, "one-click facet reset keeps search");
-            settings.SetShowVeryHidden(true);
-            view.SetFilter("", WorksheetVisibility.VeryHidden, null);
-            view.ToggleFilterPopup();
-            settings.SetShowVeryHidden(false);
-            Check(!view.FilterPopup.Visible && !view.HasFacetFilter && !list.Items.Cast<WorksheetItem>().Any(i => i.Visibility == WorksheetVisibility.VeryHidden), "setting off dismisses popup and removes obsolete VeryHidden facet");
-        }
-        using (var disposedView = new SheetListControl(settings))
-        {
-            disposedView.Dispose();
-            settings.SetOptions(false, false);
-            Check(disposedView.IsDisposed, "disposed view detaches shared settings event");
+            view.SetSearch("日本");
+            Check(list.Items.Count == 1 && view.SelectedSheetIds.SequenceEqual(new[] { "v" }), "search prunes excluded selections");
+            view.ClearSearchButton.PerformClick();
+            Check(list.Items.Count == 4 && !view.ClearSearchButton.Visible && settings.ShowHidden && settings.ShowVeryHidden, "search reset preserves ribbon visibility switches");
+            Check(view.SelectedSheetIds.SequenceEqual(new[] { "v" }), "search reset does not resurrect selections");
+            view.SetSearch("missing");
+            Check(list.Items.Count == 0 && !view.DeleteButton.Enabled, "empty results have no destructive targets");
+            rows[0] = new WorksheetItem("v", "missing now", true);
+            view.ShowWorksheets("Book", rows, "v");
+            Check(list.Items.Count == 1, "external rename refreshes search");
+            view.SetSearch("Sales"); settings.SetShowVeryHidden(false); settings.SetShowHidden(false);
+            Check(list.Items.Count == 1 && ((WorksheetItem)list.Items[0]).Kind == SheetKind.Chart, "excluded hidden sheets cannot match search");
+            view.Dispose(); settings.SetShowHidden(true);
+            Check(view.IsDisposed, "disposed panel detaches settings events");
         }
     }
 }

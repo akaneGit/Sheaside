@@ -123,7 +123,6 @@ namespace Sheaside.Services
         }
         private void OnWindowDeactivate(Excel.Workbook workbook, Excel.Window window)
         {
-            foreach (var entry in entries.Values) entry.View.CloseFilterPopup();
             if (!operating) CancelCurrentDrag("ウィンドウが切り替わったため、並び替えを中止しました。");
         }
         private void OnWorkbookActivate(Excel.Workbook workbook)
@@ -197,7 +196,7 @@ namespace Sheaside.Services
                 pane = taskPanes.Add(view, "Sheaside", window);
                 pane.DockPosition = Office.MsoCTPDockPosition.msoCTPDockPositionRight;
                 pane.Width = 300;
-                pane.Visible = preferences.StartupVisible;
+                pane.Visible = false;
                 var entry = new PaneEntry { Pane = pane, View = view };
                 entry.WorksheetHandler = (sender, args) => ActivateWorksheet(handle, entry, args.Worksheet);
                 view.WorksheetRequested += entry.WorksheetHandler;
@@ -446,7 +445,6 @@ namespace Sheaside.Services
 
         private void OnVisibleChanged(object sender, EventArgs e)
         {
-            foreach (var entry in entries.Values) if (!entry.Pane.Visible) entry.View.CloseFilterPopup();
             if (!operating) CancelCurrentDrag("パネルの表示状態が変わったため、並び替えを中止しました。");
             StateChanged?.Invoke(this, EventArgs.Empty);
             Refresh();

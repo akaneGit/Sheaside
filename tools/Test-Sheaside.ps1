@@ -30,7 +30,6 @@ $sources = @(
     'Sheaside/Services/OfficeThemeReader.cs',
     'Sheaside/Services/ExcelSheetBatchService.cs',
     'Sheaside/Controls/BatchDetailsDialog.cs',
-    'Sheaside/Controls/PreferencesDialog.cs',
     'Sheaside/Models/WorksheetDragEventArgs.cs',
     'Sheaside/Controls/ReorderableSheetListBox.cs',
     'Sheaside/Services/WorksheetMoveRules.cs',

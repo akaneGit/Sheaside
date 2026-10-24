@@ -130,7 +130,7 @@ internal static partial class SmokeTests
         Excel.Workbook other = null;
         try
         {
-            excel = new Excel.Application { Visible = false, DisplayAlerts = false };
+            excel = new Excel.Application { Visible = true, DisplayAlerts = false };
             book = excel.Workbooks.Add(Excel.XlWBATemplate.xlWBATWorksheet);
             var service = new ExcelWorksheetService(excel);
             var a = (Excel.Worksheet)book.Worksheets[1];
