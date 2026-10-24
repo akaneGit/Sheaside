@@ -77,6 +77,19 @@ namespace Sheaside.Controls
             UpdateTextExtent();
         }
 
+        internal static void DrawTabColor(Graphics graphics, Rectangle row, int? oleColor, Color background)
+        {
+            if (!oleColor.HasValue) return;
+            float scale = graphics.DpiX / 96F;
+            int inset = Math.Max(2, (int)Math.Round(3 * scale));
+            var bar = new Rectangle(row.Left + inset, row.Top + inset, Math.Max(3, (int)Math.Round(4 * scale)), Math.Max(1, row.Height - inset * 2));
+            Color color = ColorTranslator.FromOle(oleColor.Value);
+            if (Math.Abs(color.GetBrightness() - background.GetBrightness()) < .15F)
+                using (var support = new SolidBrush(background.GetBrightness() < .5F ? Color.FromArgb(110, 110, 110) : Color.FromArgb(205, 205, 205)))
+                    graphics.FillRectangle(support, Rectangle.Inflate(bar, 1, 0));
+            using (var brush = new SolidBrush(color)) graphics.FillRectangle(brush, bar);
+        }
+
         protected override void OnDrawItem(DrawItemEventArgs e)
         {
             if (e.Index < 0 || e.Index >= Items.Count) return;
@@ -85,11 +98,7 @@ namespace Sheaside.Controls
             using (var background = new SolidBrush(selected ? SystemColors.Highlight : BackColor))
                 e.Graphics.FillRectangle(background, e.Bounds);
             Color text = selected ? SystemColors.HighlightText : ForeColor;
-            var swatch = new Rectangle(e.Bounds.Left + 5, e.Bounds.Top + 5, 10, Math.Max(5, e.Bounds.Height - 10));
-            using (var brush = new SolidBrush(item.TabColor.HasValue ? ColorTranslator.FromOle(item.TabColor.Value) : BackColor))
-                e.Graphics.FillRectangle(brush, swatch);
-            using (var pen = new Pen(selected ? SystemColors.HighlightText : ForeColor))
-                e.Graphics.DrawRectangle(pen, swatch);
+            DrawTabColor(e.Graphics, e.Bounds, item.TabColor, selected ? SystemColors.Highlight : BackColor);
             int unit = Math.Max(16, (int)Math.Round(16 * e.Graphics.DpiX / 96F));
             int left = e.Bounds.Left + 22;
             TextRenderer.DrawText(e.Graphics, item.Id == activeWorksheetId ? "●" : "", Font, new Rectangle(left, e.Bounds.Top, unit, e.Bounds.Height), text, TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);

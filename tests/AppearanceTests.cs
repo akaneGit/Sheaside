@@ -13,6 +13,15 @@ internal static partial class SmokeTests
 {
     private static void TestAppearance()
     {
+        foreach (Color background in new[] { Color.White, Color.FromArgb(32, 32, 32), SystemColors.Highlight })
+        foreach (int? color in new int?[] { null, 0, ColorTranslator.ToOle(Color.White), ColorTranslator.ToOle(Color.LightYellow) })
+        using (var image = new Bitmap(100, 28))
+        using (var graphics = Graphics.FromImage(image))
+        {
+            graphics.Clear(background);
+            ReorderableSheetListBox.DrawTabColor(graphics, new Rectangle(0, 0, 100, 28), color, background);
+            Check(image.GetPixel(4, 10).ToArgb() == (color.HasValue ? ColorTranslator.FromOle(color.Value) : background).ToArgb() && image.GetPixel(10, 10).ToArgb() == background.ToArgb(), "thin tab bar preserves color and no-color background");
+        }
         foreach (SheetKind kind in Enum.GetValues(typeof(SheetKind)))
             foreach (WorksheetVisibility state in Enum.GetValues(typeof(WorksheetVisibility)))
             {
@@ -84,7 +93,7 @@ internal static partial class SmokeTests
             {
                 typeof(ReorderableSheetListBox).GetMethod("OnDrawItem", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(list, new object[] { new DrawItemEventArgs(graphics, list.Font, new Rectangle(0, 0, 260, list.ItemHeight), 20, DrawItemState.Selected) });
-                Check(bitmap.GetPixel(7, 7).ToArgb() == SystemColors.Window.ToArgb(), "unset swatch uses system theme");
+                Check(bitmap.GetPixel(7, 7).ToArgb() == SystemColors.Highlight.ToArgb(), "unset tab bar preserves selection background");
             }
         }
     }
