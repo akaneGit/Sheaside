@@ -1,13 +1,16 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <!-- MSI has a numeric version; RC 0.99.5 upgrades to final 1.0.0. -->
-  <Package Name="Sheaside 1.0.0-rc.5" Manufacturer="Sheaside" Version="0.99.5"
-           ProductCode="{834E3417-08C4-4078-A73B-6A05AF410909}"
+  <!-- MSI has a numeric version; RC 0.99.6 upgrades to final 1.0.0. -->
+  <Package Name="Sheaside 1.0.0-rc.6" Manufacturer="Sheaside" Version="0.99.6"
+           ProductCode="{7F0B255E-7C95-458A-B03E-D80D41DF048B}"
            UpgradeCode="{E2087C97-A6B5-4089-B8F5-86DB64EBB425}" Scope="perUser" Language="1033">
     <MajorUpgrade DowngradeErrorMessage="A newer Sheaside version is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Property Id="ARPCOMMENTS" Value="Excel VSTO add-in. Close Excel before installation, repair, upgrade or removal." />
-    <Property Id="NET48">
-      <RegistrySearch Id="Net48" Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" Type="raw" Bitness="always32" />
+    <Property Id="NET48_32">
+      <RegistrySearch Id="Net48_32" Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" Type="raw" Bitness="always32" />
+    </Property>
+    <Property Id="NET48_64">
+      <RegistrySearch Id="Net48_64" Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" Type="raw" Bitness="always64" />
     </Property>
     <Property Id="VSTO32">
       <RegistrySearch Id="Vsto32" Root="HKLM" Key="SOFTWARE\Microsoft\VSTO Runtime Setup\v4R" Name="VSTORFeature_CLR40" Type="raw" Bitness="always32" />
@@ -15,8 +18,10 @@
     <Property Id="VSTO64">
       <RegistrySearch Id="Vsto64" Root="HKLM" Key="SOFTWARE\Microsoft\VSTO Runtime Setup\v4R" Name="VSTORFeature_CLR40" Type="raw" Bitness="always64" />
     </Property>
-    <Launch Condition="Installed OR NET48 &gt;= 528040" Message="Install Microsoft .NET Framework 4.8 or later, then run this installer again." />
-    <Launch Condition="Installed OR VSTO32 = 1 OR VSTO64 = 1" Message="Install Microsoft Visual Studio Tools for Office Runtime (CLR 4), then run this installer again." />
+    <!-- AppSearch raw DWORDs are prefixed with '#'. Use the WiX NetFx 4.8
+         convention for six-digit .NET 4.x Release values, not an integer literal. -->
+    <Launch Condition="Installed OR NET48_32 &gt;= &quot;#528040&quot; OR NET48_64 &gt;= &quot;#528040&quot;" Message="Microsoft .NET Framework 4.8 or later was not detected in either registry view (Release 528040 or later required). If already installed, review NET48_32 and NET48_64 in the MSI log before changing your system." />
+    <Launch Condition="Installed OR VSTO32 = &quot;#1&quot; OR VSTO64 = &quot;#1&quot;" Message="Install Microsoft Visual Studio Tools for Office Runtime (CLR 4), then run this installer again." />
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
         <Directory Id="INSTALLFOLDER" Name="Sheaside">
