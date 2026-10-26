@@ -1,10 +1,10 @@
-# Sheaside 1.0.0-rc.5 インストール・配布
+# Sheaside インストール・配布（rc.6候補）
 
-Excelのシートを縦一覧で管理するWindows向けVSTOアドインです。今回の公開はプレリリースです。Microsoft 365での実インストール・更新・動作は未検証です。
+Excelのシートを縦一覧で管理するWindows向けVSTOアドインです。rc.6は未公開候補です。Microsoft 365でのrc.6実インストール・更新・動作は未検証です。公開済みrc.5では.NET検出不具合が報告されています。
 
 ## ダウンロードと前提条件
 
-公開先: https://github.com/akaneGit/Sheaside/releases/tag/v1.0.0-rc.5
+公開先: https://github.com/nyo-ro/Sheaside/releases （rc.6はまだ公開していません）
 公開リポジトリのため、閲覧・ダウンロードにリポジトリへの個別アクセス権は不要です。
 
 - WindowsのデスクトップExcel（導入予定: Microsoft 365）。Web版Excelは対象外。
@@ -15,13 +15,13 @@ Excelのシートを縦一覧で管理するWindows向けVSTOアドインです�
 ## インストール
 
 1. 作業中のブックを保存し、Excelをすべて終了します。
-2. Releaseから `Sheaside-1.0.0-rc.5.zip` を取得し、新しいフォルダーへ展開します。MSI単体でも導入可能ですが、ZIPにはこの手順とCHECKLIST.mdが入っています。
+2. 検証用の `Sheaside-1.0.0-rc.6.zip` を新しいフォルダーへ展開します。公開後は上記Releaseから取得します。MSI単体でも導入可能ですが、ZIPにはこの手順とCHECKLIST.mdが入っています。
 3. Release NotesのSHA-256とファイルを照合します。ZIP内のMSI-SHA256.txtでもMSIを照合できます。
 
 ```powershell
-Get-FileHash .\Sheaside-1.0.0-rc.5.zip -Algorithm SHA256
-Get-FileHash .\Sheaside-1.0.0-rc.5.msi -Algorithm SHA256
-msiexec /i "Sheaside-1.0.0-rc.5.msi" /L*v "Sheaside-install.log"
+Get-FileHash .\Sheaside-1.0.0-rc.6.zip -Algorithm SHA256
+Get-FileHash .\Sheaside-1.0.0-rc.6.msi -Algorithm SHA256
+msiexec /i "Sheaside-1.0.0-rc.6.msi" /L*v "Sheaside-install.log"
 ```
 
 4. MSIを実行します。通常は管理者として起動せず、Excelを使用するユーザーで実行してください。旧ClickOnce版は先にWindowsのアプリ管理から削除します。MSIとClickOnceの自動移行は行いません。
@@ -44,14 +44,14 @@ MSIはAuthenticode未署名です。VSTOの2つのマニフェストは既存の
 
 導入先では発行元不明の確認や信頼エラーが発生し、企業ポリシーによって読み込みが拒否される可能性があります。MSIは証明書を信頼ストアへ自動登録せず、Office/SmartScreen/ウイルス対策の設定も変更しません。配布元・ハッシュ・証明書を確認し、組織端末では管理者の承認を受けて信頼条件を整備してください。警告が出た場合の無条件な実行・保護無効化は案内しません。正式配布用コード署名証明書による署名は今後の課題です。秘密鍵・PFX・パスワードは配布しません。
 
-## rc.2からの手動更新
+## rc.2 / rc.5からの手動更新
 
-Excelを終了してrc.5のMSIを実行します。同じユーザーにインストールされた旧MSIを検出し、置き換える構成です。
+Excelを終了してrc.6のMSIを実行します。同じユーザーにインストールされた旧MSIを検出し、置き換える構成です。
 
-| 項目 | rc.2 | rc.5 |
+| 項目 | rc.2 | rc.6 |
 | --- | --- | --- |
-| MSI ProductVersion | 0.99.2 | 0.99.5 |
-| ProductCode | {5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2} | {834E3417-08C4-4078-A73B-6A05AF410909} |
+| MSI ProductVersion | 0.99.2 | 0.99.6 |
+| ProductCode | {5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2} | {7F0B255E-7C95-458A-B03E-D80D41DF048B} |
 | UpgradeCode | {E2087C97-A6B5-4089-B8F5-86DB64EBB425} | 同一 |
 
 MajorUpgradeで旧版を検出し、新版導入済み環境へのダウングレードを拒否します。Component GUIDは維持しています。構造検証は実更新成功を意味しません。rc.2からの実更新・設定引継ぎは未検証です。旧版が別ユーザーや別配布方式で登録されている場合は自動移行を期待しないでください。同じrc.5の別バイナリでの上書き公開は行いません。
@@ -61,9 +61,9 @@ MajorUpgradeで旧版を検出し、新版導入済み環境へのダウング�
 Excelを終了し、Windowsのアプリ管理からSheasideを削除するか、以下を実行します。
 
 ```powershell
-msiexec /x "Sheaside-1.0.0-rc.5.msi" /L*v "Sheaside-uninstall.log"
+msiexec /x "Sheaside-1.0.0-rc.6.msi" /L*v "Sheaside-uninstall.log"
 # 同じ版の修復
-msiexec /fa "Sheaside-1.0.0-rc.5.msi" /L*v "Sheaside-repair.log"
+msiexec /fa "Sheaside-1.0.0-rc.6.msi" /L*v "Sheaside-repair.log"
 ```
 
 本体とMSIが登録したアドイン情報を削除し、ユーザー設定とExcelブックは残す構成です。削除後に同じMSIを実行して再インストールできます。実際の削除・修復・再インストールは未検証です。
@@ -78,6 +78,18 @@ MSIにはSheaside.dll、Sheaside.dll.manifest、Sheaside.vsto、Microsoft.Office
 
 ## 再生成（開発者向け）
 
-`tools/Build-Msi.ps1`はWiX 4.0.6を再利用し、`artifacts/rc.5`へ出力します。既存出力フォルダーがある場合は中止し、既存成果物を上書きしません。配布バイナリはGit管理せずGitHub Releasesへ添付します。
+`tools/Build-Msi.ps1`はWiX 4.0.6を再利用し、`artifacts/rc.6`へ出力します。既存出力フォルダーがある場合は中止し、既存成果物を上書きしません。配布バイナリはGit管理せずGitHub Releasesへ添付します。
 
 参考: [MicrosoftのWindows Installer配布](https://learn.microsoft.com/en-us/visualstudio/vsto/deploying-a-vsto-solution-by-using-windows-installer)、[VSTOの信頼](https://learn.microsoft.com/en-us/visualstudio/vsto/granting-trust-to-office-solutions)、[Major Upgrade](https://learn.microsoft.com/en-us/windows/win32/msi/major-upgrades)。
+
+## .NET Frameworkが入っているのに拒否される場合
+
+rc.5はレジストリのDWORDをMSIが `#533509` のような文字列で返すことを考慮せず、数値528040と比較していました。VSTO Runtimeにも同様の型の不一致がありました。rc.6では両方を修正し、.NETは32bit/64bit両レジストリビューを検索します。
+
+```powershell
+Get-ItemPropertyValue -LiteralPath 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full' -Name Release
+```
+
+528040以上（533509など）なら要件を満たします。rc.5のエラーだけを理由に、既にある.NETを削除したりOSレジストリを書き換えたりしないでください。rc.6で再検証し、失敗した場合はログ中のNET48_32・NET48_64・VSTO32・VSTO64を確認してください。ログ共有前にユーザー名やローカルパスをマスクしてください。
+
+判定の修正はインストール全体の成功を保証しません。VSTO信頼エラー、Officeビット数、更新・削除は別途検証が必要です。rc.5の公開DLLには開発時PDBの絶対パスが含まれていたため、rc.6 Releaseはデバッグ情報を生成しません。Debug構成は従来どおりです。

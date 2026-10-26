@@ -1,3 +1,5 @@
+> 過去の開発記録です。現行手順は[インストール](../deployment.md)・[操作](../usage.md)・[検証](../testing.md)を参照してください。
+
 # Sheaside 1.0.0-rc.5
 
 **プレリリースです。Microsoft 365での実インストール・動作確認は未実施です。** 正式版v1.0への移行は実機確認後に判断します。
@@ -65,4 +67,4 @@ msiexec /x "Sheaside-1.0.0-rc.5.msi" /L*v "Sheaside-uninstall.log"
 0BB09DDA87108529EC91F91732CA07A8F87ABD960B126F43731478CB7CF133CA  Sheaside-1.0.0-rc.5.zip
 ```
 
-詳細は[導入手順](https://github.com/akaneGit/Sheaside/blob/v1.0.0-rc.5/docs/deployment.md)と[Microsoft 365確認リスト](https://github.com/akaneGit/Sheaside/blob/v1.0.0-rc.5/docs/rc.5-install-checklist.md)を参照してください。
+詳細は[導入手順](https://github.com/nyo-ro/Sheaside/blob/v1.0.0-rc.5/docs/deployment.md)と[Microsoft 365確認リスト](https://github.com/nyo-ro/Sheaside/blob/v1.0.0-rc.5/docs/rc.5-install-checklist.md)を参照してください。

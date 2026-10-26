@@ -1,8 +1,10 @@
+> 過去の開発記録です。現行手順は[インストール](../deployment.md)・[操作](../usage.md)・[検証](../testing.md)を参照してください。
+
 # RC5配布準備記録
 
 - 開始: main、HEAD a3329050de5e3889456d12aff820dcb236b9571e、作業ツリークリーン。
-- origin: https://github.com/akaneGit/Sheaside.git。認証・push権限を確認。非公開設定を維持する。
-- タグ/Release: v1.0.0-rc.5（開始時は同名なし）。プレリリースのみ。公開先URLは https://github.com/akaneGit/Sheaside/releases/tag/v1.0.0-rc.5 。
+- origin: https://github.com/nyo-ro/Sheaside.git。認証・push権限を確認。非公開設定を維持する。
+- タグ/Release: v1.0.0-rc.5（開始時は同名なし）。プレリリースのみ。公開先URLは https://github.com/nyo-ro/Sheaside/releases/tag/v1.0.0-rc.5 。
 - アプリケーションソースはa332905をそのまま使用。配布準備ではUI/機能を変更しない。
 - AssemblyVersion/マニフェスト識別子1.0.0.0、FileVersion 1.0.0.5、InformationalVersion 1.0.0-rc.5。
 - MSI: ProductVersion 0.99.5、ProductCode {834E3417-08C4-4078-A73B-6A05AF410909}。UpgradeCode {E2087C97-A6B5-4089-B8F5-86DB64EBB425}とComponent GUIDをrc.2から維持。MajorUpgrade・旧版削除・新版検出条件を検証したが、実更新は未検証。

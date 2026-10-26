@@ -1,3 +1,5 @@
+> 過去の開発記録です。現行手順は[インストール](../deployment.md)・[操作](../usage.md)・[検証](../testing.md)を参照してください。
+
 # 1.0.0-rc.4 開発記録
 
 基点7434a51（rc.3）。既存slnx Project Id/csproj SubType・CanonicalName差分を保持し、コミットしない。MSI再作成・公開・M365インストール対象外。

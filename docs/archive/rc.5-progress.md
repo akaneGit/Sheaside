@@ -1,3 +1,5 @@
+> 過去の開発記録です。現行手順は[インストール](../deployment.md)・[操作](../usage.md)・[検証](../testing.md)を参照してください。
+
 # Sheaside 1.0.0-rc.5 開発・検証記録
 
 基点 `b0e16b3`（RC4と承認済みメタデータ整理）。開始時の作業ツリーはクリーン。WinForms/VSTO・既存シート管理・リボン構成を維持する。MSI再作成、GitHub Releases公開、Microsoft 365インストールは対象外。

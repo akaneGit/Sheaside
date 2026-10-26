@@ -1,3 +1,5 @@
+> 過去の開発記録です。現行手順は[インストール](../deployment.md)・[操作](../usage.md)・[検証](../testing.md)を参照してください。
+
 # Sheaside 1.0.0-rc.2 開発・検証記録
 
 基点はaaeeb7c（1.0.0-rc.1）。WinForms/VSTOと既存のサービス・ID選択管理・バッチ安全性を維持した。Microsoft 365実機確認前のRCであり、正式版ではない。
@@ -51,6 +53,6 @@ WiX 4.0.6のMSIビルド・ICE検証成功。MSI読み取り専用検証14項目
 
 `tools/Verify-Phase.ps1`で両ビルド・管理テスト・Excel連携を再現できる。`tools/Build-Msi.ps1`でMSI/ZIPと検証を再生成する。開発ビルドはExcelの開発用登録を更新するので、MSI確認は別PC/ユーザーで行う。
 
-[Microsoft 365チェックリスト](rc.2-checklist.md)はすべて未実施として作成した。[配布手順](deployment.md)に従って導入し、記録欄に結果を残す。実機結果を踏まえて正式v1.0への移行を判断する。
+[Microsoft 365チェックリスト](rc.2-checklist.md)はすべて未実施として作成した。[配布手順](../deployment.md)に従って導入し、記録欄に結果を残す。実機結果を踏まえて正式v1.0への移行を判断する。
 
 技術資料: [VSTO MSI配布](https://learn.microsoft.com/en-us/visualstudio/vsto/deploying-a-vsto-solution-by-using-windows-installer)、[VSTO登録](https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins)、[Tab.ThemeColor](https://learn.microsoft.com/en-us/office/vba/api/excel.tab.themecolor)、[Tab.TintAndShade](https://learn.microsoft.com/en-us/office/vba/api/excel.tab.tintandshade)。

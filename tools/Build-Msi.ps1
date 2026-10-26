@@ -43,7 +43,7 @@ Copy-Item -LiteralPath (Join-Path $repoRoot 'docs/deployment.md') -Destination (
 $hash = (Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash
 [IO.File]::WriteAllText((Join-Path $artifacts 'MSI-SHA256.txt'), "$hash  Sheaside-1.0.0-rc.6.msi`r`n")
 
-Copy-Item -LiteralPath (Join-Path $repoRoot 'docs/rc.5-install-checklist.md') -Destination (Join-Path $artifacts 'CHECKLIST.md')
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs/testing.md') -Destination (Join-Path $artifacts 'CHECKLIST.md')
 # Create ZIP once, including only the allowlisted distribution files.
 $zip = Join-Path $artifacts 'Sheaside-1.0.0-rc.6.zip'
 Compress-Archive -LiteralPath $msi,(Join-Path $artifacts 'INSTALL.md'),(Join-Path $artifacts 'CHECKLIST.md'),(Join-Path $artifacts 'MSI-SHA256.txt') -DestinationPath $zip
