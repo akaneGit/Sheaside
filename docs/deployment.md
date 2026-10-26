@@ -1,13 +1,13 @@
-# Sheaside インストール・配布（rc.6候補）
+# Sheaside インストール・配布（1.0.0-rc.6）
 
-Excelのシートを縦一覧で管理するWindows向けVSTOアドインです。rc.6は未公開候補です。Microsoft 365でのrc.6実インストール・更新・動作は未検証です。公開済みrc.5では.NET検出不具合が報告されています。
+Excelのシートを縦一覧で管理するWindows向けVSTOアドインです。rc.6はプレリリースです。2026-10-26のユーザー報告により、.NET Framework 4.8.1環境でVSTO Runtime導入後のMSIインストール、Microsoft 365でのアドイン起動・主要機能・UIを確認済みです。旧版からの更新、修復・削除・再インストール、Office両ビット数での検証は未完了です。
 
 ## ダウンロードと前提条件
 
-公開先: https://github.com/nyo-ro/Sheaside/releases （rc.6はまだ公開していません）
+公開先: https://github.com/nyo-ro/Sheaside/releases/tag/v1.0.0-rc.6
 公開リポジトリのため、閲覧・ダウンロードにリポジトリへの個別アクセス権は不要です。
 
-- WindowsのデスクトップExcel（導入予定: Microsoft 365）。Web版Excelは対象外。
+- WindowsのデスクトップExcel（Microsoft 365でユーザー実機確認済み）。Web版Excelは対象外。
 - [.NET Framework 4.8以上](https://learn.microsoft.com/en-us/dotnet/framework/install/on-windows-10)。MSIはRelease値528040以上を確認します。
 - [Visual Studio 2010 Tools for Office Runtime](https://www.microsoft.com/en-us/download/details.aspx?id=105522)のCLR 4対応版。OS/Officeに適したMicrosoft公式ランタイムを導入してください。MSIは前提ソフトを自動取得しません。
 - MSIはx86・ユーザー単位、アドインはAny CPU。HKCUへの登録により32/64bit Officeを想定しますが、両ビット数のMicrosoft 365検証は未実施です。ARM版Office・全ユーザー一括導入は対象外です。
@@ -15,7 +15,7 @@ Excelのシートを縦一覧で管理するWindows向けVSTOアドインです�
 ## インストール
 
 1. 作業中のブックを保存し、Excelをすべて終了します。
-2. 検証用の `Sheaside-1.0.0-rc.6.zip` を新しいフォルダーへ展開します。公開後は上記Releaseから取得します。MSI単体でも導入可能ですが、ZIPにはこの手順とCHECKLIST.mdが入っています。
+2. 上記Releaseから `Sheaside-1.0.0-rc.6.zip` を取得し、新しいフォルダーへ展開します。MSI単体でも導入可能ですが、ZIPにはこの手順とCHECKLIST.mdが入っています。
 3. Release NotesのSHA-256とファイルを照合します。ZIP内のMSI-SHA256.txtでもMSIを照合できます。
 
 ```powershell
@@ -54,7 +54,7 @@ Excelを終了してrc.6のMSIを実行します。同じユーザーにイン�
 | ProductCode | {5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2} | {7F0B255E-7C95-458A-B03E-D80D41DF048B} |
 | UpgradeCode | {E2087C97-A6B5-4089-B8F5-86DB64EBB425} | 同一 |
 
-MajorUpgradeで旧版を検出し、新版導入済み環境へのダウングレードを拒否します。Component GUIDは維持しています。構造検証は実更新成功を意味しません。rc.2からの実更新・設定引継ぎは未検証です。旧版が別ユーザーや別配布方式で登録されている場合は自動移行を期待しないでください。同じrc.5の別バイナリでの上書き公開は行いません。
+MajorUpgradeで旧版を検出し、新版導入済み環境へのダウングレードを拒否します。Component GUIDは維持しています。構造検証は実更新成功を意味しません。rc.2 / rc.5からの実更新・設定引継ぎは未検証です。旧版が別ユーザーや別配布方式で登録されている場合は自動移行を期待しないでください。同じrc.5の別バイナリでの上書き公開は行いません。
 
 ## アンインストール・再インストール
 
@@ -74,7 +74,7 @@ MSIにはSheaside.dll、Sheaside.dll.manifest、Sheaside.vsto、Microsoft.Office
 
 `.vsto`と`.dll.manifest`はMSIでも必要なVSTOマニフェストです。登録には`|vstolocal`を使用し、ClickOnce配布や自動更新は使用しません。既存のClickOnce関連設定・スクリプトは削除せず保存しています。
 
-開発PCはVisual StudioとMSIが同じアドイン登録先を使用するため、実インストール検証は別PC/別ユーザーを推奨します。今回は開発環境の登録を保護し、MSIの実インストールは行っていません。Microsoft 365・Officeビット数・実DPI・企業ポリシーによる差はCHECKLIST.mdで確認してください。
+開発PCはVisual StudioとMSIが同じアドイン登録先を使用するため、実インストール検証は別PC/別ユーザーを推奨します。開発環境では登録を保護し、MSIの実インストールは行っていません。別途、ユーザーのMicrosoft 365環境でrc.6の実インストール成功が報告されています。Microsoft 365・Officeビット数・実DPI・企業ポリシーによる差はCHECKLIST.mdで確認してください。
 
 ## 再生成（開発者向け）
 

@@ -8,20 +8,29 @@ MSI前提条件テストでは生成MSIをWindows Installerのセッションと
 
 rc.5も同じ実レジストリでAppSearchを実行し、.NET・VSTOの旧条件が両方拒否することを再現しました。原因はraw DWORDの`#`接頭辞を考慮しない比較です。修正は[MicrosoftのRegLocator仕様](https://learn.microsoft.com/en-us/windows/win32/msi/reglocator-table)と[WiX 4.0.6の.NET 4.8判定](https://github.com/wixtoolset/wix/blob/v4.0.6/src/ext/NetFx/wixlib/NetFx48.wxs)に沿った、6桁の.NET 4.x Release値の比較です。将来Release値の桁数が変わる場合は比較方式の再検証が必要です。
 
-rc.5 MSI/ZIPと旧rc.2成果物のSHA-256が変わっていないことを確認しました。rc.6候補は`artifacts/rc.6`に分離し、公開・タグ作成・pushは行っていません。公開DLL内パスの監査結果と対処待ちは[公開履歴の取り扱い](publication.md)を参照してください。
+rc.5 MSI/ZIPと旧rc.2成果物のSHA-256が変わっていないことを確認しました。修正作業時点ではrc.6候補を`artifacts/rc.6`に分離し、公開・タグ作成・pushは行っていませんでした。今回の公開対象はユーザー実機確認済みの同一MSIです。ZIPのみ同梱文書更新のため再梱包し、ハッシュを再計算します。公開DLL内パスの監査結果と対処待ちは[公開履歴の取り扱い](publication.md)を参照してください。
 
-rc.5のMicrosoft 365導入で、Release=533509でも.NET不足と誤判定された事例があります。rc.6は検出条件を修正した未公開候補です。Microsoft 365での再インストール確認は未実施です。
+rc.5のMicrosoft 365導入で、Release=533509でも.NET不足と誤判定された事例があります。rc.6は検出条件を修正しています。新規導入はユーザー実機確認済み、再インストールは未確認です。
 
-- [ ] Release=533509の問題発生PCでrc.6の新規インストールに成功する
+- [x] .NET Framework 4.8.1環境でVSTO Runtime導入後、rc.6のMSIインストールに成功（ユーザー報告）
 - [ ] Office 32bit / 64bitで.NET・VSTO Runtimeの検出に成功する
 - [ ] rc.2 / rc.5からrc.6への更新と、rc.6から旧版へのダウングレード拒否
 - [ ] アンインストール・再インストール・修復
 
 以下は以前のチェックリストを保持したものです。rc.5と書かれた導入先は次回確認ではrc.6に読み替え、旧版の結果と区別して記録してください。
 
-## Microsoft 365導入チェックリスト（未完了）
+## Microsoft 365実機確認（2026-10-26 ユーザー報告）
 
-# Microsoft 365導入確認（全項目未確認）
+- [x] .NET Framework 4.8.1環境でのMSIインストール
+- [x] VSTO Runtime導入後のMSIインストール
+- [x] Microsoft 365でのアドイン起動
+- [x] Microsoft 365での主要なシート管理機能・UI
+
+Officeの詳細ビルド・ビット数・全チェック項目個別の結果までは報告されていません。以下の詳細ケースは未記録のまま残し、総合的な動作確認を全環境・全異常系の成功とは扱いません。
+
+## Microsoft 365詳細チェックリスト
+
+### 詳細ケース（個別結果未記録）
 
 実施日、Windows/Officeバージョン、Office 32/64bit、表示倍率、導入前Sheaside版、結果・ログを記録してください。保存不要のテストブックを使用します。今回の構造検証は実インストール成功を保証しません。
 
@@ -72,7 +81,7 @@ rc.5のMicrosoft 365導入で、Release=533509でも.NET不足と誤判定され
 
 # RC5 手動確認チェックリスト
 
-Excel 2013でのユーザー手動確認用。Microsoft 365は全項目未確認。自動検証の結果は[開発記録](archive/rc.5-progress.md)を参照する。
+Excel 2013でのユーザー手動確認用。当時のMicrosoft 365個別ケースは未確認。rc.6のユーザー実機報告は上記の確認済み一覧を参照。自動検証の結果は[開発記録](archive/rc.5-progress.md)を参照する。
 
 ## 準備
 
@@ -94,4 +103,4 @@ Visual StudioでDebugビルド→F5。標準［表示］タブ→Sheaside→シ�
 - [ ] 100/125/150%の実OS倍率でパレットと一覧を確認。狭いパネルでも名前と右アイコンが重ならない。
 - [ ] Officeの明/暗テーマ・高コントラストで、選択背景・文字・状態アイコン・淡色バーが読める。
 
-Microsoft 365では上記に加え、32/64bit Office、通常/簡略化リボン、モニター間DPI変更、テーマ切替・再起動を確認する。配布用MSIの作成とGitHub Releases公開は、この手動確認後の別作業。
+Microsoft 365では上記に加え、32/64bit Office、通常/簡略化リボン、モニター間DPI変更、テーマ切替・再起動を確認する。rc.6ではユーザー実機確認済みのMSIをGitHubプレリリースへ公開します。
