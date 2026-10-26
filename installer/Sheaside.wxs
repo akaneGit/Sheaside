@@ -1,9 +1,10 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <!-- MSI has a numeric version; RC 0.99.6 upgrades to final 1.0.0. -->
-  <Package Name="Sheaside 1.0.0-rc.6" Manufacturer="Sheaside" Version="0.99.6"
-           ProductCode="{7F0B255E-7C95-458A-B03E-D80D41DF048B}"
+  <!-- MSI has a numeric version; final release 1.0.0 retains the RC upgrade family. -->
+  <Package Name="Sheaside 1.0.0" Manufacturer="Sheaside" Version="1.0.0"
+           ProductCode="{493B22A8-C746-4D1C-9749-14108ED59252}"
            UpgradeCode="{E2087C97-A6B5-4089-B8F5-86DB64EBB425}" Scope="perUser" Language="1033">
     <MajorUpgrade DowngradeErrorMessage="A newer Sheaside version is already installed." />
+    <Launch Condition="Installed OR NOT WIX_UPGRADE_DETECTED" Message="An earlier Sheaside version is installed. Close Excel, uninstall the existing Sheaside from Windows Apps, then run this installer again. Direct upgrades are not supported." />
     <MediaTemplate EmbedCab="yes" />
     <Property Id="ARPCOMMENTS" Value="Excel VSTO add-in. Close Excel before installation, repair, upgrade or removal." />
     <Property Id="NET48_32">

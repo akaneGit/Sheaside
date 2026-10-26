@@ -9,9 +9,13 @@ Excelのシートを縦型一覧で管理するWindows向けVSTOアドインで�
 
 ## ダウンロードと対応状況
 
-[Sheaside 1.0.0-rc.6](https://github.com/nyo-ro/Sheaside/releases/tag/v1.0.0-rc.6)が現在のプレリリースです。.NET Framework・VSTO Runtimeの検出不具合と、配布DLL内の開発PCパスを修正しました。rc.5の問題のあるMSI・ZIPは配布を終了しました。正式v1.0ではありません。
+[Sheaside 1.0.0](https://github.com/nyo-ro/Sheaside/releases/tag/v1.0.0)が正式版です。rc.6の既存機能と、.NET/VSTO検出・配布DLLの個人パス対策を維持しています。
 
-デスクトップ版Excel・.NET Framework 4.8以上・VSTO Runtimeを使用します。開発検証はExcel 2013です。ユーザー実機報告により、.NET Framework 4.8.1・VSTO Runtime導入後のMSIインストール、Microsoft 365でのアドイン起動・主要機能・UIを確認済みです。旧版からの更新、修復・削除・再インストール、Office 32bit/64bit両方での検証は未完了です。Web版・Mac版Excelは対象外です。
+Windowsデスクトップ版Excel・.NET Framework 4.8以上・Visual Studio Tools for Office Runtimeが必要です。Excel 2013で自動検証しています。Microsoft 365 **64bit版**ではrc.6のインストール・起動・主要機能・UI・アンインストール・再インストールをユーザー実機確認済みです。新しい1.0.0 MSIのMicrosoft 365実インストールは未実施です。
+
+**更新時はExcelをすべて終了し、既存Sheasideをアンインストールしてから新しいMSIを実行してください。** 旧版からの直接更新は保証せず、同一ユーザーの旧MSIを検出した場合はインストーラーが削除を案内して停止します。
+
+32bit版Officeは利用禁止ではありませんが、今回の対応保証・実機検証の対象外です。その他の未検証Office環境、Web版・Mac版Excelは動作保証しません。
 
 ## ドキュメント
 

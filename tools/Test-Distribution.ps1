@@ -2,7 +2,7 @@
 param([string]$Directory)
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if (-not $Directory) { $Directory = Join-Path $root 'artifacts/rc.6' }
+if (-not $Directory) { $Directory = Join-Path $root 'artifacts/v1.0.0' }
 $payload = Join-Path $root 'Sheaside/bin/Release'
 $script:checks = 0
 function Assert-Package($condition, $message) {
@@ -10,7 +10,7 @@ function Assert-Package($condition, $message) {
     $script:checks++
 }
 $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $payload 'Sheaside.dll'))
-Assert-Package ($version.FileVersion -eq '1.0.0.6' -and $version.ProductVersion -eq '1.0.0-rc.6') 'Wrong application version'
+Assert-Package ($version.FileVersion -eq '1.0.0.7' -and $version.ProductVersion -eq '1.0.0') 'Wrong application version'
 $identity = [Reflection.AssemblyName]::GetAssemblyName((Join-Path $payload 'Sheaside.dll'))
 Assert-Package ($identity.Version.ToString() -eq '1.0.0.0' -and $identity.ProcessorArchitecture -eq 'MSIL') 'Wrong assembly identity/architecture'
 $assembly = [Reflection.Assembly]::ReflectionOnlyLoadFrom((Join-Path $payload 'Sheaside.dll'))
@@ -38,8 +38,8 @@ foreach ($name in @('Sheaside.vsto','Sheaside.dll.manifest')) {
     Assert-Package ($cert.Thumbprint -eq 'C61660B9D07850DE0D156C9127355F4124B5093A' -and -not $cert.HasPrivateKey) 'Unexpected manifest certificate'
 }
 $expanded = Join-Path $root ('Sheaside/obj/zip-check-' + [guid]::NewGuid().ToString('N'))
-Expand-Archive -LiteralPath (Join-Path $Directory 'Sheaside-1.0.0-rc.6.zip') -DestinationPath $expanded
-$expected = @('Sheaside-1.0.0-rc.6.msi','INSTALL.md','CHECKLIST.md','MSI-SHA256.txt')
+Expand-Archive -LiteralPath (Join-Path $Directory 'Sheaside-1.0.0.zip') -DestinationPath $expanded
+$expected = @('Sheaside-1.0.0.msi','INSTALL.md','CHECKLIST.md','MSI-SHA256.txt')
 $files = @(Get-ChildItem -LiteralPath $expanded -File -Recurse)
 Assert-Package ($files.Count -eq 4) 'Unexpected ZIP payload'
 foreach ($name in $expected) {
@@ -55,4 +55,6 @@ Assert-Package ((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/Sheaside-
 Assert-Package ((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/Sheaside-1.0.0-rc.2.zip')).Hash -eq '7CAB5FA1B0AED9601D135D8CB783222542E16385052F251A096E27542863DC6B') 'Original rc.2 ZIP changed'
 Assert-Package ((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/rc.5/Sheaside-1.0.0-rc.5.msi')).Hash -eq '33942038BCA5B104A3AFF244D3EFE3C0037957720E2729FD94CD41B5C44D98F0') 'Published rc.5 MSI changed'
 Assert-Package ((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/rc.5/Sheaside-1.0.0-rc.5.zip')).Hash -eq '0BB09DDA87108529EC91F91732CA07A8F87ABD960B126F43731478CB7CF133CA') 'Published rc.5 ZIP changed'
+Assert-Package ((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/rc.6/Sheaside-1.0.0-rc.6.msi')).Hash -eq '400014DC76EECBB1332804B62797AAB0A82F689241C8EE610D489A681A912D7C') 'Published rc.6 MSI changed'
+Assert-Package ((Get-FileHash -LiteralPath (Join-Path $root 'artifacts/rc.6/Sheaside-1.0.0-rc.6.zip')).Hash -eq 'B9885309FD51740F8129A0985F89F1581619EE359C1BB1BA9E9F8115272896B4') 'Published rc.6 ZIP changed'
 Write-Output "PASS: $script:checks distribution assertions (no installation performed)"

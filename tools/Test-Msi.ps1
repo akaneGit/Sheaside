@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$Path, [string]$ExpectedVersion = '0.99.6')
+param([Parameter(Mandatory=$true)][string]$Path, [string]$ExpectedVersion = '1.0.0')
 $ErrorActionPreference = 'Stop'
 $installer = New-Object -ComObject WindowsInstaller.Installer
 $database = $installer.OpenDatabase([IO.Path]::GetFullPath($Path), 0)
@@ -20,8 +20,8 @@ function Read-Rows([string]$query, [int]$columns) {
 }
 try {
     $properties = @{}; Read-Rows 'SELECT `Property`, `Value` FROM `Property`' 2 | ForEach-Object { $properties[$_[0]]=$_[1] }
-    Assert-Msi ($properties.ProductVersion -eq $ExpectedVersion) 'numeric RC version'
-    if ($ExpectedVersion -eq '0.99.6') { Assert-Msi ($properties.ProductCode -ne '{5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2}') 'new ProductCode differs from rc.2' }
+    Assert-Msi ($properties.ProductVersion -eq $ExpectedVersion) 'numeric product version'
+    if ($ExpectedVersion -in @('0.99.6','1.0.0')) { Assert-Msi ($properties.ProductCode -ne '{5E6A06B4-0794-49AD-8F9B-5084BBD8C2E2}') 'new ProductCode differs from rc.2' }
     Assert-Msi (-not $properties.ContainsKey('ALLUSERS')) 'per-user installation'
     Assert-Msi ($properties.UpgradeCode -eq '{E2087C97-A6B5-4089-B8F5-86DB64EBB425}') 'stable upgrade family'
     $files = @(Read-Rows 'SELECT `FileName` FROM `File`' 1 | ForEach-Object { $_[0].Split('|')[-1] })
@@ -37,7 +37,7 @@ try {
     Assert-Msi (@($upgrades | Where-Object { $_[0] -eq $ExpectedVersion -and $_[3] -eq 'WIX_DOWNGRADE_DETECTED' }).Count -eq 1) 'newer versions detected for downgrade block'
     Assert-Msi (@(Read-Rows 'SELECT `Action` FROM `InstallExecuteSequence`' 1 | Where-Object { $_[0] -eq 'RemoveExistingProducts' }).Count -eq 1) 'major upgrade removes detected old product'
     Assert-Msi (@(Read-Rows 'SELECT `Condition` FROM `LaunchCondition`' 1).Count -ge 3) 'runtime and downgrade prerequisites'
-    if ($ExpectedVersion -eq '0.99.6') {
+    if ($ExpectedVersion -in @('0.99.6','1.0.0')) {
         Assert-Msi ($properties.ProductCode -ne '{834E3417-08C4-4078-A73B-6A05AF410909}') 'new ProductCode differs from rc.5'
         $locators = @(Read-Rows 'SELECT `Signature_`, `Root`, `Key`, `Name`, `Type` FROM `RegLocator`' 5)
         $searches = @(Read-Rows 'SELECT `Property`, `Signature_` FROM `AppSearch`' 2)
@@ -54,6 +54,17 @@ try {
         }
     }
     Assert-Msi (@(Read-Rows 'SELECT `Cabinet` FROM `Media`' 1 | Where-Object { $_[0].StartsWith('#') }).Count -eq 1) 'embedded cabinet for single MSI distribution'
+    if ($ExpectedVersion -eq '1.0.0') {
+        Assert-Msi ($properties.ProductCode -eq '{493B22A8-C746-4D1C-9749-14108ED59252}') 'final ProductCode distinct from RC products'
+        Assert-Msi ($conditions -contains 'Installed OR NOT WIX_UPGRADE_DETECTED') 'old product blocks direct upgrade'
+        foreach ($table in @('InstallUISequence','InstallExecuteSequence')) {
+            $sequence = @{}; Read-Rows ('SELECT `Action`, `Sequence` FROM `' + $table + '`') 2 | ForEach-Object {$sequence[$_[0]]=[int]$_[1]}
+            Assert-Msi ($sequence.ContainsKey('FindRelatedProducts') -and $sequence.FindRelatedProducts -lt $sequence.LaunchConditions) 'related products detected before launch checks'
+            if ($table -eq 'InstallExecuteSequence') { Assert-Msi ($sequence.LaunchConditions -lt $sequence.RemoveExistingProducts -and $sequence.LaunchConditions -lt $sequence.InstallInitialize) 'refusal precedes mutation/removal' }
+        }
+        $components = @(Read-Rows 'SELECT `ComponentId`, `KeyPath` FROM `Component`' 2)
+        Assert-Msi ($components.Count -eq 1 -and $components[0][0] -eq '{88493179-F1AC-441F-B5F4-7866E025FDF4}') 'single stable registration component'
+    }
     Write-Output "PASS: $script:checks MSI assertions (read-only; install/repair/uninstall not executed)"
 } finally {
     [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($database)

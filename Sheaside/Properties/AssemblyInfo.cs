@@ -7,8 +7,8 @@ using System.Security;
 // アセンブリに関連付けられている情報を変更するには、
 // これらの属性値を変更してください。
 [assembly: AssemblyTitle("Sheaside")]
-[assembly: AssemblyDescription("Excel sheet manager — v1.0 Release Candidate")]
-[assembly: AssemblyInformationalVersion("1.0.0-rc.6")]
+[assembly: AssemblyDescription("Excel sheet manager")]
+[assembly: AssemblyInformationalVersion("1.0.0")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Sheaside")]
@@ -35,5 +35,5 @@ using System.Security;
 // 既定値にすることができます:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.6")]
+[assembly: AssemblyFileVersion("1.0.0.7")]
 
